@@ -27,9 +27,9 @@ export const addThousandsSeparator = (num: number | string): string => {
   const parts = num.toString().split(".");
   const integerPart = parts[0];
   const fractionalPart = parts[1];
-  
+
   if (!integerPart) return "";
-  
+
   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
   return fractionalPart
@@ -55,19 +55,41 @@ interface ExpenseLineData {
 }
 
 export const prepareExpenseBarChartData = (data: ExpenseData[] = []) => {
-  const chartData = data.map((item) => ({
-    category: item?.category,
-    amount: item?.amount,
+  // Group expenses by date and sum amounts
+  const dateTotals: Record<string, number> = {};
+
+  data.forEach((item) => {
+    const date = moment(item?.date).format("Do MMM");
+    const amount = item?.amount || 0;
+
+    if (dateTotals[date]) {
+      dateTotals[date] += amount;
+    } else {
+      dateTotals[date] = amount;
+    }
+  });
+
+  // Convert to array format for chart and sort by date
+  const chartData = Object.entries(dateTotals).map(([date, amount]) => ({
+    month: date, // Using 'month' key for consistency with chart component
+    amount,
   }));
 
-  return chartData;
+  // Sort by date to show latest to the right
+  return chartData.sort((a, b) => {
+    const dateA = moment(a.month, "Do MMM");
+    const dateB = moment(b.month, "Do MMM");
+    return dateA.valueOf() - dateB.valueOf();
+  });
 };
 
 export const prepareIncomeBarChartData = (data: IncomeData[] = []) => {
-  const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const sortedData = [...data].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+  );
 
   const chartData = sortedData.map((item) => ({
-    month: moment(item?.date).format('Do MMM'),
+    month: moment(item?.date).format("Do MMM"),
     amount: item?.amount,
     source: item?.source,
   }));
@@ -76,10 +98,12 @@ export const prepareIncomeBarChartData = (data: IncomeData[] = []) => {
 };
 
 export const prepareExpenseLineChartData = (data: ExpenseLineData[] = []) => {
-  const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const sortedData = [...data].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+  );
 
   const chartData = sortedData.map((item) => ({
-    month: moment(item?.date).format('Do MMM'),
+    month: moment(item?.date).format("Do MMM"),
     amount: item?.amount,
     category: item?.category,
   }));

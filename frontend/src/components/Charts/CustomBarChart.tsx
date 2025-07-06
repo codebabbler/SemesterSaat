@@ -28,16 +28,38 @@ interface CustomBarChartProps {
 const CustomBarChart: React.FC<CustomBarChartProps> = ({ data }) => {
   // Function to alternate colors
   const getBarColor = (index: number) => {
-    return index % 2 === 0 ? "#875cf5" : "#cfbefb"; 
+    return index % 2 === 0 ? "#875cf5" : "#cfbefb";
   };
 
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: TooltipPayload[] }) => {
-    if (active && payload && payload.length && payload[0]) {
+  // Determine which field to use for X-axis based on data structure
+  const getXAxisKey = () => {
+    if (data.length > 0 && data[0]) {
+      return data[0].month ? "month" : "category";
+    }
+    return "month"; // default fallback
+  };
+
+  const xAxisKey = getXAxisKey();
+
+  const CustomTooltip = ({
+    active,
+    payload,
+  }: {
+    active?: boolean;
+    payload?: TooltipPayload[];
+  }) => {
+    if (active && payload?.length && payload[0]) {
+      const data = payload[0].payload;
+      const label = data.category ?? data.month ?? "Unknown";
+
       return (
-        <div className="bg-white shadow-md rounded-lg p-2 border border-gray-300">
-          <p className="text-xs font-semibold text-purple-800 mb-1">{payload[0].payload.category}</p>
+        <div className="rounded-lg border border-gray-300 bg-white p-2 shadow-md">
+          <p className="mb-1 text-xs font-semibold text-purple-800">{label}</p>
           <p className="text-sm text-gray-600">
-            Amount: <span className="text-sm font-medium text-gray-900">${payload[0].payload.amount}</span>
+            Amount:{" "}
+            <span className="text-sm font-medium text-gray-900">
+              ${data.amount}
+            </span>
           </p>
         </div>
       );
@@ -46,26 +68,25 @@ const CustomBarChart: React.FC<CustomBarChartProps> = ({ data }) => {
   };
 
   return (
-    <div className="bg-white mt-6">
+    <div className="mt-6 bg-white">
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
           <CartesianGrid stroke="none" />
 
-          <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#555" }} stroke="none" />
+          <XAxis
+            dataKey={xAxisKey}
+            tick={{ fontSize: 12, fill: "#555" }}
+            stroke="none"
+          />
           <YAxis tick={{ fontSize: 12, fill: "#555" }} stroke="none" />
 
           <Tooltip content={CustomTooltip} />
 
-          <Bar
-            dataKey="amount"
-            fill="#FF8042"
-            radius={[10, 10, 0, 0]}
-          >
+          <Bar dataKey="amount" fill="#875cf5" radius={[10, 10, 0, 0]}>
             {data.map((entry, index) => (
               <Cell key={index} fill={getBarColor(index)} />
             ))}
           </Bar>
-
         </BarChart>
       </ResponsiveContainer>
     </div>
