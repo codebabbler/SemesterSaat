@@ -1,0 +1,29 @@
+{
+  "name": "SemesterSaat",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev:backend": "cd backend && pnpm dev",
+    "dev:frontend": "cd frontend && pnpm dev",
+    "dev": "concurrently \"pnpm run dev:backend\" \"pnpm run dev:frontend\"",
+    "build:backend": "cd backend && pnpm build",
+    "build:frontend": "cd frontend && pnpm build",
+    "build": "concurrently \"pnpm run build:backend\" \"pnpm run build:frontend\"",
+    "start:backend": "cd backend && pnpm start",
+    "start:frontend": "cd frontend && pnpm start",
+    "start": "concurrently \"pnpm run start:backend\" \"pnpm run start:frontend\"",
+    "lint:backend": "cd backend && pnpm lint",
+    "lint:frontend": "cd frontend && pnpm lint",
+    "lint": "concurrently \"pnpm run lint:backend\" \"pnpm run lint:frontend\"",
+    "test:backend": "cd backend && pnpm test",
+    "test:frontend": "cd frontend && pnpm test",
+    "test": "concurrently \"pnpm run test:backend\" \"pnpm run test:frontend\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.12.4",
+  "dependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
