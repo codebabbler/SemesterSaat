@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Input from "~/components/Inputs/Input";
+import DatePicker from "~/components/Inputs/DatePicker";
 import EmojiPickerPopup from "~/components/EmojiPickerPopup";
 
 interface IncomeData {
@@ -49,12 +50,11 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
         type="number"
       />
 
-      <Input
+      <DatePicker
         value={income.date}
-        onChange={({ target }) => handleChange("date", target.value)}
+        onChange={(date) => handleChange("date", date)}
         label="Date"
-        placeholder=""
-        type="date"
+        placeholder="Select income date"
       />
 
       <div className="flex justify-end mt-6">
