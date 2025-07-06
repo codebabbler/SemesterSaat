@@ -8,6 +8,7 @@ import {
   LuTrendingDown,
   LuTrash2,
 } from "react-icons/lu";
+import { formatCurrency } from "~/utils/constants";
 
 interface TransactionInfoCardProps {
   icon?: string;
@@ -26,31 +27,37 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
   amount,
   type,
   hideDeleteBtn,
-  onDelete
+  onDelete,
 }) => {
   const getAmountStyles = () =>
     type === "income" ? "bg-green-50 text-green-500" : "bg-red-50 text-red-500";
 
   return (
-    <div className="group relative flex items-center gap-4 mt-2 p-3 rounded-lg hover:bg-gray-100/60">
-      <div className="w-12 h-12 flex items-center justify-center text-xl text-gray-800 bg-gray-100 rounded-full">
+    <div className="group relative mt-2 flex items-center gap-4 rounded-lg p-3 hover:bg-gray-100/60">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-800">
         {icon ? (
-          <Image src={icon} alt={title} width={24} height={24} className="w-6 h-6" />
+          <Image
+            src={icon}
+            alt={title}
+            width={24}
+            height={24}
+            className="h-6 w-6"
+          />
         ) : (
           <LuUtensils />
         )}
       </div>
 
-      <div className="flex-1 flex items-center justify-between">
+      <div className="flex flex-1 items-center justify-between">
         <div>
-          <p className="text-sm text-gray-700 font-medium">{title}</p>
-          <p className="text-xs text-gray-400 mt-1">{date}</p>
+          <p className="text-sm font-medium text-gray-700">{title}</p>
+          <p className="mt-1 text-xs text-gray-400">{date}</p>
         </div>
 
         <div className="flex items-center gap-2">
           {!hideDeleteBtn && (
-            <button 
-              className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            <button
+              className="cursor-pointer text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
               onClick={onDelete}
             >
               <LuTrash2 size={18} />
@@ -58,10 +65,10 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
           )}
 
           <div
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md ${getAmountStyles()}`}
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 ${getAmountStyles()}`}
           >
             <h6 className="text-xs font-medium">
-              {type === "income" ? "+" : "-"} ${amount}
+              {type === "income" ? "+" : "-"} {formatCurrency(amount)}
             </h6>
             {type === "income" ? <LuTrendingUp /> : <LuTrendingDown />}
           </div>

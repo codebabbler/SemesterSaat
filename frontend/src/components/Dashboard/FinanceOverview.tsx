@@ -2,6 +2,7 @@
 
 import React from "react";
 import CustomPieChart from "~/components/Charts/CustomPieChart";
+import { formatCurrency } from "~/utils/constants";
 
 interface FinanceOverviewProps {
   totalBalance: number;
@@ -9,10 +10,10 @@ interface FinanceOverviewProps {
   totalExpense: number;
 }
 
-const FinanceOverview: React.FC<FinanceOverviewProps> = ({ 
-  totalBalance, 
-  totalIncome, 
-  totalExpense 
+const FinanceOverview: React.FC<FinanceOverviewProps> = ({
+  totalBalance,
+  totalIncome,
+  totalExpense,
 }) => {
   const COLORS = ["#875CF5", "#FA2C37", "#FF6900"];
 
@@ -24,14 +25,14 @@ const FinanceOverview: React.FC<FinanceOverviewProps> = ({
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between ">
+      <div className="flex items-center justify-between">
         <h5 className="text-lg">Financial Overview</h5>
       </div>
 
       <CustomPieChart
         data={balanceData}
         label="Total Balance"
-        totalAmount={`$${totalBalance}`}
+        totalAmount={formatCurrency(totalBalance)}
         colors={COLORS}
         showTextAnchor
       />

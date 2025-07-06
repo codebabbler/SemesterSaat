@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import CustomPieChart from "~/components/Charts/CustomPieChart";
+import { formatCurrency } from "~/utils/constants";
 
-const COLORS = ["#875CF5", "#FA2C37", "#FF6900", "#4f39f6"];
-
-interface IncomeData {
+interface Income {
+  _id: string;
   source: string;
+  icon?: string;
+  date: string;
   amount: number;
 }
 
@@ -16,13 +18,13 @@ interface ChartData {
 }
 
 interface RecentIncomeWithChartProps {
-  data: IncomeData[];
+  data: Income[];
   totalIncome: number;
 }
 
-const RecentIncomeWithChart: React.FC<RecentIncomeWithChartProps> = ({ 
-  data, 
-  totalIncome 
+const RecentIncomeWithChart: React.FC<RecentIncomeWithChartProps> = ({
+  data,
+  totalIncome,
 }) => {
   const [chartData, setChartData] = useState<ChartData[]>([]);
 
@@ -37,20 +39,20 @@ const RecentIncomeWithChart: React.FC<RecentIncomeWithChartProps> = ({
 
   useEffect(() => {
     prepareChartData();
-
-    return () => {};
   }, [data]);
+
+  const COLORS = ["#875CF5", "#FA2C37", "#FF6900", "#00C49F"];
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between ">
+      <div className="flex items-center justify-between">
         <h5 className="text-lg">Last 60 Days Income</h5>
       </div>
 
       <CustomPieChart
         data={chartData}
         label="Total Income"
-        totalAmount={`$${totalIncome}`}
+        totalAmount={formatCurrency(totalIncome)}
         showTextAnchor
         colors={COLORS}
       />

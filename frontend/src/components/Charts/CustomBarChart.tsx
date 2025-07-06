@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { formatCurrency } from "~/utils/constants";
 
 interface ChartData {
   month?: string;
@@ -58,7 +59,7 @@ const CustomBarChart: React.FC<CustomBarChartProps> = ({ data }) => {
           <p className="text-sm text-gray-600">
             Amount:{" "}
             <span className="text-sm font-medium text-gray-900">
-              ${data.amount}
+              {formatCurrency(data.amount)}
             </span>
           </p>
         </div>

@@ -1,8 +1,14 @@
+"use client";
+
 import React from "react";
+import { formatCurrency } from "~/utils/constants";
 
 interface TooltipPayload {
-  name?: string;
   value?: number;
+  payload?: {
+    name: string;
+    amount: number;
+  };
 }
 
 interface CustomTooltipProps {
@@ -11,12 +17,17 @@ interface CustomTooltipProps {
 }
 
 const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload }) => {
-  if (active && payload && payload.length) {
+  if (active && payload?.length && payload[0]) {
     return (
-      <div className="bg-white shadow-md rounded-lg p-2 border border-gray-300">
-        <p className="text-xs font-semibold text-purple-800 mb-1">{payload[0]?.name}</p>
+      <div className="rounded-lg border border-gray-300 bg-white p-2 shadow-md">
+        <p className="mb-1 text-xs font-semibold text-purple-800">
+          {payload[0]?.payload?.name}
+        </p>
         <p className="text-sm text-gray-600">
-          Amount: <span className="text-sm font-medium text-gray-900">${payload[0]?.value}</span>
+          Amount:{" "}
+          <span className="text-sm font-medium text-gray-900">
+            {formatCurrency(payload[0]?.value || 0)}
+          </span>
         </p>
       </div>
     );
