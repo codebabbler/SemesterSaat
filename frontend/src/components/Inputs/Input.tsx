@@ -8,7 +8,7 @@ interface InputProps {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder?: string;
-  type?: "text" | "password" | "email" | "number";
+  type?: "text" | "password" | "email" | "number" | "date";
 }
 
 const Input: React.FC<InputProps> = ({ label, value, onChange, placeholder, type = "text" }) => {
