@@ -65,6 +65,10 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
     password,
   });
 
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    user._id.toString()
+  );
+
   const createdUser = await User.findById(user._id).select(
     "-password -refreshToken"
   );
@@ -73,10 +77,26 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiErrors(500, "Something went wrong while registering user");
   }
 
-  console.log("req.files: ", req.files);
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
   res
     .status(201)
-    .json(new ApiResponse(200, createdUser, "User created successfully"));
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: createdUser,
+          accessToken,
+          refreshToken,
+        },
+        "User created successfully"
+      )
+    );
   return;
 });
 
@@ -135,10 +155,11 @@ const logoutUser = asyncHandler(
     if (!req.user) {
       throw new ApiErrors(401, "User not authenticated");
     }
-    await User.findByIdAndUpdate(req.user._id, {
-      $set: { refreshToken: undefined },
-      new: true,
-    });
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { $unset: { refreshToken: 1 } },
+      { new: true }
+    );
     const options = {
       httpOnly: true,
       secure: true,
