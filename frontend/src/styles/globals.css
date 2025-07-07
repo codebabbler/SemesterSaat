@@ -1,6 +1,58 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-display: "Poppins", "sans-serif";
+  --breakpoint-3xl: 1920px;
+  --color-primary: #875cf5;
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  --default-font-feature-settings: normal;
+  --default-font-variation-settings: normal;
+  --default-mono-font-feature-settings: normal;
+  --default-mono-font-variation-settings: normal;
+}
+
+@variant dark (false);
+
+@layer base {
+  html {
+    font-family: var(--font-display);
+  }
+
+  body {
+    background-color: #fcfbfc;
+    overflow-x: hidden;
+  }
+}
+
+.recharts-bar-rectangle:hover {
+  fill: rgba(255, 255, 0, 0.2) !important;
+}
+
+.input-box {
+  @apply mt-3 mb-4 flex w-full justify-between gap-3 rounded border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-black outline-none;
+}
+
+.btn-primary {
+  @apply my-1 w-full rounded-md bg-violet-500 p-[10px] text-sm font-medium text-white shadow-lg shadow-purple-600/5 hover:bg-purple-600/15 hover:text-purple-600;
+}
+
+.card {
+  @apply rounded-2xl border border-gray-200/50 bg-white p-6 shadow-md shadow-gray-100;
+}
+
+.card-btn {
+  @apply flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200/50 bg-gray-50 px-4 py-1.5 text-[12px] font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-500;
+}
+
+.add-btn {
+  @apply flex cursor-pointer items-center gap-1.5 rounded-lg border border-purple-100 bg-purple-50 px-4 py-2 text-xs font-medium whitespace-nowrap text-purple-600 md:text-sm;
+}
+
+.add-btn-fill {
+  @apply bg-primary text-white;
 }
