@@ -1,0 +1,339 @@
+import { Response } from "express";
+import asyncHandler from "../utils/asyncHandler";
+import ApiErrors from "../utils/ApiErrors";
+import ApiResponse from "../utils/ApiResponse";
+import Income from "../models/income.models";
+import type { IIncome } from "../models/income.models";
+import { AuthenticatedRequest } from "../types/common.types";
+import * as xlsx from "xlsx";
+import * as fs from "fs";
+import * as path from "path";
+
+// Add Income
+const addIncome = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { icon, source, amount, date } = req.body;
+
+    // Validation: Check for missing fields
+    if (
+      [source, amount, date].some(
+        (field) => field === undefined || field === null || field === ""
+      )
+    ) {
+      throw new ApiErrors(400, "Source, amount, and date are required");
+    }
+
+    // Validate amount is a positive number
+    if (typeof amount !== "number" || amount <= 0) {
+      throw new ApiErrors(400, "Amount must be a positive number");
+    }
+
+    // Validate date
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      throw new ApiErrors(400, "Invalid date format");
+    }
+
+    const newIncome = await Income.create({
+      userId: req.user._id,
+      icon: icon || "",
+      source: source.trim(),
+      amount,
+      date: parsedDate,
+    });
+
+    res.status(201).json(
+      new ApiResponse(201, newIncome, "Income added successfully")
+    );
+  }
+);
+
+// Get All Income (For Logged-in User)
+const getAllIncome = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc" } = req.query;
+
+    // Validate pagination parameters
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+
+    if (pageNum < 1 || limitNum < 1) {
+      throw new ApiErrors(400, "Page and limit must be positive numbers");
+    }
+
+    const skip = (pageNum - 1) * limitNum;
+    const sortDirection = sortOrder === "asc" ? 1 : -1;
+
+    const income = await Income.find({ userId: req.user._id })
+      .sort({ [sortBy as string]: sortDirection })
+      .skip(skip)
+      .limit(limitNum)
+      .select("-__v");
+
+    const totalCount = await Income.countDocuments({ userId: req.user._id });
+
+    res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          income,
+          pagination: {
+            currentPage: pageNum,
+            totalPages: Math.ceil(totalCount / limitNum),
+            totalItems: totalCount,
+            itemsPerPage: limitNum,
+          },
+        },
+        "Income retrieved successfully"
+      )
+    );
+  }
+);
+
+// Get Income by ID
+const getIncomeById = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { id } = req.params;
+
+    if (!id) {
+      throw new ApiErrors(400, "Income ID is required");
+    }
+
+    const income = await Income.findOne({ _id: id, userId: req.user._id });
+
+    if (!income) {
+      throw new ApiErrors(404, "Income not found");
+    }
+
+    res.status(200).json(
+      new ApiResponse(200, income, "Income retrieved successfully")
+    );
+  }
+);
+
+// Update Income
+const updateIncome = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { id } = req.params;
+    const { icon, source, amount, date } = req.body;
+
+    if (!id) {
+      throw new ApiErrors(400, "Income ID is required");
+    }
+
+    // Build update object with only provided fields
+    const updateData: Partial<IIncome> = {};
+    
+    if (icon !== undefined) updateData.icon = icon;
+    if (source !== undefined) {
+      if (!source.trim()) {
+        throw new ApiErrors(400, "Source cannot be empty");
+      }
+      updateData.source = source.trim();
+    }
+    if (amount !== undefined) {
+      if (typeof amount !== "number" || amount <= 0) {
+        throw new ApiErrors(400, "Amount must be a positive number");
+      }
+      updateData.amount = amount;
+    }
+    if (date !== undefined) {
+      const parsedDate = new Date(date);
+      if (isNaN(parsedDate.getTime())) {
+        throw new ApiErrors(400, "Invalid date format");
+      }
+      updateData.date = parsedDate;
+    }
+
+    const updatedIncome = await Income.findOneAndUpdate(
+      { _id: id, userId: req.user._id },
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedIncome) {
+      throw new ApiErrors(404, "Income not found");
+    }
+
+    res.status(200).json(
+      new ApiResponse(200, updatedIncome, "Income updated successfully")
+    );
+  }
+);
+
+// Delete Income
+const deleteIncome = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { id } = req.params;
+
+    if (!id) {
+      throw new ApiErrors(400, "Income ID is required");
+    }
+
+    const deletedIncome = await Income.findOneAndDelete({
+      _id: id,
+      userId: req.user._id,
+    });
+
+    if (!deletedIncome) {
+      throw new ApiErrors(404, "Income not found");
+    }
+
+    res.status(200).json(
+      new ApiResponse(200, null, "Income deleted successfully")
+    );
+  }
+);
+
+// Download Income Details in Excel
+const downloadIncomeExcel = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const income = await Income.find({ userId: req.user._id })
+      .sort({ date: -1 })
+      .select("-__v -userId");
+
+    if (!income.length) {
+      throw new ApiErrors(404, "No income records found");
+    }
+
+    // Prepare data for Excel
+    const data = income.map((item) => ({
+      Source: item.source,
+      Amount: item.amount,
+      Date: item.date.toISOString().split("T")[0], // Format date as YYYY-MM-DD
+      Icon: item.icon || "",
+      "Created At": item.createdAt.toISOString().split("T")[0],
+    }));
+
+    // Create workbook and worksheet
+    const wb = xlsx.utils.book_new();
+    const ws = xlsx.utils.json_to_sheet(data);
+
+    // Add some styling and formatting
+    const range = xlsx.utils.decode_range(ws["!ref"] || "A1");
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const address = xlsx.utils.encode_col(C) + "1";
+      if (!ws[address]) continue;
+      ws[address].s = { font: { bold: true } };
+    }
+
+    xlsx.utils.book_append_sheet(wb, ws, "Income Records");
+
+    // Generate filename with timestamp
+    const filename = `income_details_${new Date().toISOString().split("T")[0]}.xlsx`;
+    const filepath = path.join(process.cwd(), "temp", filename);
+
+    // Ensure temp directory exists
+    const tempDir = path.join(process.cwd(), "temp");
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    // Write file
+    xlsx.writeFile(wb, filepath);
+
+    // Set proper headers for file download
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    // Send file and clean up
+    res.download(filepath, filename, (err) => {
+      if (err) {
+        console.error("Error downloading file:", err);
+      }
+      // Clean up temp file
+      fs.unlink(filepath, (unlinkErr) => {
+        if (unlinkErr) {
+          console.error("Error deleting temp file:", unlinkErr);
+        }
+      });
+    });
+  }
+);
+
+// Get Income Statistics
+const getIncomeStats = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { year, month } = req.query;
+
+    // Build date filter
+    const dateFilter: any = {};
+    if (year) {
+      const startDate = new Date(parseInt(year as string), 0, 1);
+      const endDate = new Date(parseInt(year as string) + 1, 0, 1);
+      dateFilter.date = { $gte: startDate, $lt: endDate };
+    }
+    if (month && year) {
+      const startDate = new Date(parseInt(year as string), parseInt(month as string) - 1, 1);
+      const endDate = new Date(parseInt(year as string), parseInt(month as string), 1);
+      dateFilter.date = { $gte: startDate, $lt: endDate };
+    }
+
+    const stats = await Income.aggregate([
+      { $match: { userId: req.user._id, ...dateFilter } },
+      {
+        $group: {
+          _id: null,
+          totalIncome: { $sum: "$amount" },
+          averageIncome: { $avg: "$amount" },
+          count: { $sum: 1 },
+          maxIncome: { $max: "$amount" },
+          minIncome: { $min: "$amount" },
+        },
+      },
+    ]);
+
+    const result = stats.length > 0 ? stats[0] : {
+      totalIncome: 0,
+      averageIncome: 0,
+      count: 0,
+      maxIncome: 0,
+      minIncome: 0,
+    };
+
+    res.status(200).json(
+      new ApiResponse(200, result, "Income statistics retrieved successfully")
+    );
+  }
+);
+
+export {
+  addIncome,
+  getAllIncome,
+  getIncomeById,
+  updateIncome,
+  deleteIncome,
+  downloadIncomeExcel,
+  getIncomeStats,
+};

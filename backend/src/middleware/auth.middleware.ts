@@ -2,7 +2,10 @@ import asyncHandler from "../utils/asyncHandler";
 import ApiErrors from "../utils/ApiErrors";
 import JWT from "jsonwebtoken";
 import User from "../models/user.models";
-export const verifyJWT = asyncHandler(async (req: any, _, next) => {
+import type { IUser } from "../models/user.models";
+import { AuthenticatedRequest } from "../types/common.types";
+
+export const verifyJWT = asyncHandler(async (req: AuthenticatedRequest, _, next) => {
   try {
     const token =
       req.cookies?.accessToken ||
@@ -16,7 +19,7 @@ export const verifyJWT = asyncHandler(async (req: any, _, next) => {
     ) as JWT.JwtPayload;
     const user = await User.findById(decodedToken?._id).select(
       "-password -refreshToken"
-    );
+    ) as IUser | null;
     if (!user) {
       throw new ApiErrors(401, "Invalid access token");
     }

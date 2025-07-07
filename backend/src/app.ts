@@ -20,12 +20,13 @@ app.use(cookieParser());
 
 // Routes
 import authRouter from "./routes/user.routes";
-// import dashboardRouter from "./routes/dashboard.routes.js";
-// import expenseRouter from "./routes/expense.routes.js";
-// import incomeRouter from "./routes/income.routes.js";
+import dashboardRouter from "./routes/dashboard.routes";
+import expenseRouter from "./routes/expense.routes";
+import incomeRouter from "./routes/income.routes";
+
 app.use("/api/v1/user", authRouter);
-// app.use("/api/v1/dashboard", dashboardRouter);
-// app.use("/api/v1/expense", expenseRouter);
-// app.use("/api/v1/income", incomeRouter);
+app.use("/api/v1/dashboard", dashboardRouter);
+app.use("/api/v1/expense", expenseRouter);
+app.use("/api/v1/income", incomeRouter);
 
 export default app;

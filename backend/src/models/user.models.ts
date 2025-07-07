@@ -1,6 +1,22 @@
-import { Schema, model } from "mongoose";
+import { Schema, model, Document } from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+
+// User interface
+interface IUser extends Document {
+  _id: string;
+  username: string;
+  fullName: string;
+  email: string;
+  password: string;
+  profileImageUrl?: string;
+  refreshToken?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  generateAccessToken(): string;
+  generateRefreshToken(): string;
+  isPasswordCorrect(password: string): Promise<boolean>;
+}
 const userSchema = new Schema(
   {
     username: {
@@ -9,7 +25,6 @@ const userSchema = new Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
     fullName: {
       type: String,
@@ -80,5 +95,10 @@ userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(jwtPayload, jwtSecret, jwtOptions);
 };
 
-const User = model("User", userSchema);
+// Create indexes for better query performance
+userSchema.index({ refreshToken: 1 });
+
+const User = model<IUser>("User", userSchema);
+
 export default User;
+export type { IUser };

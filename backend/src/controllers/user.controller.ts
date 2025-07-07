@@ -1,26 +1,11 @@
 import asyncHandler from "../utils/asyncHandler";
 import ApiErrors from "../utils/ApiErrors";
 import User from "../models/user.models";
+import type { IUser } from "../models/user.models";
 import ApiResponse from "../utils/ApiResponse";
 import JWT from "jsonwebtoken";
-import { Request, Response } from "express";
-import { Document } from "mongoose";
-
-interface IUser extends Document {
-  _id: string;
-  username: string;
-  fullName: string;
-  email: string;
-  password: string;
-  refreshToken?: string;
-  generateAccessToken(): string;
-  generateRefreshToken(): string;
-  isPasswordCorrect(password: string): Promise<boolean>;
-}
-
-interface AuthenticatedRequest extends Request {
-  user?: IUser;
-}
+import { Response } from "express";
+import { AuthenticatedRequest } from "../types/common.types";
 
 const generateAccessAndRefreshToken = async (userID: string) => {
   try {
@@ -39,7 +24,7 @@ const generateAccessAndRefreshToken = async (userID: string) => {
   }
 };
 
-const registerUser = asyncHandler(async (req: Request, res: Response) => {
+const registerUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { fullName, username, email, password } = req.body;
 
   if (
@@ -100,7 +85,7 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
   return;
 });
 
-const loginUser = asyncHandler(async (req: Request, res: Response) => {
+const loginUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { email, username, password } = req.body;
   console.log(email, username, password);
 
@@ -172,7 +157,7 @@ const logoutUser = asyncHandler(
   }
 );
 
-const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
+const refreshAccessToken = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const incomingRefreshToken =
     req.cookies?.refreshToken || req.body?.refreshToken;
   if (!incomingRefreshToken) {
@@ -286,4 +271,5 @@ export {
   changePassword,
   getUserProfile,
   updateUserProfile,
+  IUser,
 };
