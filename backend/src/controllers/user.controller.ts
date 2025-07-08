@@ -82,7 +82,6 @@ const registerUser = asyncHandler(async (req: AuthenticatedRequest, res: Respons
         "User created successfully"
       )
     );
-  return;
 });
 
 const loginUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -197,7 +196,6 @@ const refreshAccessToken = asyncHandler(async (req: AuthenticatedRequest, res: R
           "Access token refreshed successfully"
         )
       );
-    return;
   } catch (error: any) {
     throw new ApiErrors(401, error?.message || "Unauthorized access");
   }
@@ -256,10 +254,8 @@ const updateUserProfile = asyncHandler(
 
     await user.save({ validateBeforeSave: true });
     res
-
       .status(200)
       .json(new ApiResponse(200, user, "User profile updated successfully"));
-    return;
   }
 );
 

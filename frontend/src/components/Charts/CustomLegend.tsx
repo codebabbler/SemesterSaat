@@ -11,7 +11,6 @@ interface CustomLegendProps {
 
 const CustomLegend: React.FC<CustomLegendProps> = ({ payload }) => {
   if (!payload) return null;
-  
   return (
     <div className="flex flex-wrap justify-center gap-2 mt-4 space-x-6">
       {payload.map((entry, index) => (

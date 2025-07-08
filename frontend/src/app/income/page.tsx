@@ -53,8 +53,8 @@ const Income = () => {
         `${API_PATHS.INCOME.GET_ALL_INCOME}`
       );
 
-      if (response.data) {
-        setIncomeData(response.data as IncomeData[]);
+      if (response.data?.data?.income) {
+        setIncomeData(response.data.data.income as IncomeData[]);
       }
     } catch (error) {
       console.log("Something went wrong. Please try again.", error);
