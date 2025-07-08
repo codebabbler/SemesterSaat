@@ -1,22 +1,35 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useContext } from "react";
 import { useRouter } from "next/navigation";
-import { safeLocalStorage } from "~/utils/localStorage";
+import { UserContext } from "~/context/UserContext";
+import { useUserAuth } from "~/hooks/useUserAuth";
 
 export default function HomePage() {
   const router = useRouter();
+  const context = useContext(UserContext);
+  
+  if (!context) {
+    throw new Error("HomePage must be used within a UserProvider");
+  }
+  
+  const { user } = context;
+  
+  // Use the auth hook to check/fetch user state
+  useUserAuth();
 
   useEffect(() => {
-    const isAuthenticated = !!safeLocalStorage.getItem("token");
+    // Wait a bit for auth check to complete
+    const timer = setTimeout(() => {
+      if (user) {
+        router.push("/dashboard");
+      } else {
+        router.push("/login");
+      }
+    }, 500);
 
-    // Redirect to dashboard if authenticated, otherwise to login
-    if (isAuthenticated) {
-      router.push("/dashboard");
-    } else {
-      router.push("/login");
-    }
-  }, [router]);
+    return () => clearTimeout(timer);
+  }, [user, router]);
 
   return (
     <div className="flex min-h-screen items-center justify-center">

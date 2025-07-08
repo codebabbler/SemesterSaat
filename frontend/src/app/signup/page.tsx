@@ -8,21 +8,21 @@ import Input from "~/components/Inputs/Input";
 import { validateEmail } from "~/utils/helper";
 import ProfilePhotoSelector from "~/components/Inputs/ProfilePhotoSelector";
 import { API_PATHS } from "~/utils/apiPaths";
-import uploadImage from "~/utils/uploadImage";
 import { UserContext } from "~/context/UserContext";
 import axiosInstance from "~/utils/axiosInstance";
-import { safeLocalStorage } from "~/utils/localStorage";
 
 interface User {
-  id: string;
+  _id: string;
   email: string;
   fullName: string;
+  username: string;
   profileImageUrl?: string;
 }
 
 const SignUpForm = () => {
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -46,6 +46,11 @@ const SignUpForm = () => {
       return;
     }
 
+    if (!username) {
+      setError("Please enter a username");
+      return;
+    }
+
     if (!validateEmail(email)) {
       setError("Please enter a valid email address.");
       return;
@@ -60,24 +65,21 @@ const SignUpForm = () => {
 
     // SignUp API Call
     try {
-      // Upload image if present
-      if (profilePic) {
-        const imgUploadRes = await uploadImage(profilePic);
-        profileImageUrl = imgUploadRes.imageUrl ?? "";
-      }
-
+      // TODO: Implement image upload endpoint in backend
+      // For now, register without profile image
       const response = await axiosInstance.post(API_PATHS.AUTH.REGISTER, {
         fullName,
+        username,
         email,
         password,
-        profileImageUrl,
       });
 
-      const { token, user } = response.data as { token: string; user: User };
+      const { data } = response.data as { data: { user: User; accessToken: string; refreshToken: string } };
 
-      if (token) {
-        safeLocalStorage.setItem("token", token);
-        updateUser(user);
+      if (data.user) {
+        // Convert _id to id for frontend compatibility
+        const userWithId = { ...data.user, id: data.user._id };
+        updateUser(userWithId);
         router.push("/dashboard");
       }
     } catch (error: unknown) {
@@ -110,17 +112,27 @@ const SignUpForm = () => {
               value={fullName}
               onChange={({ target }) => setFullName(target.value)}
               label="Full Name"
-              placeholder="John"
+              placeholder="John Doe"
               type="text"
             />
 
             <Input
-              value={email}
-              onChange={({ target }) => setEmail(target.value)}
-              label="Email Address"
-              placeholder="john@example.com"
+              value={username}
+              onChange={({ target }) => setUsername(target.value)}
+              label="Username"
+              placeholder="johndoe"
               type="text"
             />
+
+            <div className="col-span-2">
+              <Input
+                value={email}
+                onChange={({ target }) => setEmail(target.value)}
+                label="Email Address"
+                placeholder="john@example.com"
+                type="text"
+              />
+            </div>
 
             <div className="col-span-2">
               <Input
