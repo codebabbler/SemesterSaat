@@ -7,6 +7,7 @@ import { API_PATHS } from "../utils/apiPaths";
 interface User {
   id: string;
   email: string;
+  username: string;
   fullName: string;
   profileImageUrl?: string;
 }

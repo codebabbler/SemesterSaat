@@ -11,7 +11,6 @@ import InfoCard from "~/components/Cards/InfoCard";
 import { useUserAuth } from "~/hooks/useUserAuth";
 import axiosInstance from "~/utils/axiosInstance";
 import { API_PATHS } from "~/utils/apiPaths";
-import { addThousandsSeparator } from "~/utils/helper";
 import RecentTransactions from "~/components/Dashboard/RecentTransactions";
 import FinanceOverview from "~/components/Dashboard/FinanceOverview";
 import ExpenseTransactions from "~/components/Dashboard/ExpenseTransactions";
@@ -91,21 +90,21 @@ const Dashboard = () => {
           <InfoCard
             icon={<IoMdCard />}
             label="Total Balance"
-            value={addThousandsSeparator(dashboardData?.totalBalance ?? 0)}
+            value={dashboardData?.totalBalance ?? 0}
             color="bg-primary"
           />
 
           <InfoCard
             icon={<LuWalletMinimal />}
             label="Total Income"
-            value={addThousandsSeparator(dashboardData?.totalIncome ?? 0)}
+            value={dashboardData?.totalIncome ?? 0}
             color="bg-orange-500"
           />
 
           <InfoCard
             icon={<LuHandCoins />}
             label="Total Expenses"
-            value={addThousandsSeparator(dashboardData?.totalExpenses ?? 0)}
+            value={dashboardData?.totalExpenses ?? 0}
             color="bg-red-500"
           />
         </div>

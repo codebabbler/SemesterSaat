@@ -14,6 +14,7 @@ import { safeLocalStorage } from "~/utils/localStorage";
 interface User {
   id: string;
   email: string;
+  username: string;
   fullName: string;
   profileImageUrl?: string;
 }
@@ -52,10 +53,10 @@ const LoginForm = () => {
         email,
         password,
       });
-      const { token, user } = response.data as { token: string; user: User };
+      const { accessToken, user } = response.data as { accessToken: string; user: User };
 
-      if (token) {
-        safeLocalStorage.setItem("token", token);
+      if (accessToken) {
+        safeLocalStorage.setItem("token", accessToken);
         updateUser(user);
         router.push("/dashboard");
       }

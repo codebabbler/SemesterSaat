@@ -16,6 +16,7 @@ import { safeLocalStorage } from "~/utils/localStorage";
 interface User {
   id: string;
   email: string;
+  username: string;
   fullName: string;
   profileImageUrl?: string;
 }
@@ -23,6 +24,7 @@ interface User {
 const SignUpForm = () => {
   const [profilePic, setProfilePic] = useState<File | null>(null);
   const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -43,6 +45,11 @@ const SignUpForm = () => {
 
     if (!fullName) {
       setError("Please enter your name");
+      return;
+    }
+
+    if (!username) {
+      setError("Please enter a username");
       return;
     }
 
@@ -68,15 +75,16 @@ const SignUpForm = () => {
 
       const response = await axiosInstance.post(API_PATHS.AUTH.REGISTER, {
         fullName,
+        username,
         email,
         password,
         profileImageUrl,
       });
 
-      const { token, user } = response.data as { token: string; user: User };
+      const { accessToken, user } = response.data as { accessToken: string; user: User };
 
-      if (token) {
-        safeLocalStorage.setItem("token", token);
+      if (accessToken) {
+        safeLocalStorage.setItem("token", accessToken);
         updateUser(user);
         router.push("/dashboard");
       }
@@ -110,10 +118,20 @@ const SignUpForm = () => {
               value={fullName}
               onChange={({ target }) => setFullName(target.value)}
               label="Full Name"
-              placeholder="John"
+              placeholder="John Doe"
               type="text"
             />
 
+            <Input
+              value={username}
+              onChange={({ target }) => setUsername(target.value)}
+              label="Username"
+              placeholder="johndoe"
+              type="text"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
             <Input
               value={email}
               onChange={({ target }) => setEmail(target.value)}
@@ -122,15 +140,13 @@ const SignUpForm = () => {
               type="text"
             />
 
-            <div className="col-span-2">
-              <Input
-                value={password}
-                onChange={({ target }) => setPassword(target.value)}
-                label="Password"
-                placeholder="Min 8 Characters"
-                type="password"
-              />
-            </div>
+            <Input
+              value={password}
+              onChange={({ target }) => setPassword(target.value)}
+              label="Password"
+              placeholder="Min 8 Characters"
+              type="password"
+            />
           </div>
 
           {error && <p className="text-red-500 text-xs pb-2.5">{error}</p>}

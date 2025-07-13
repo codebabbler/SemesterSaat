@@ -53,8 +53,8 @@ const Expense = () => {
         `${API_PATHS.EXPENSE.GET_ALL_EXPENSE}`
       );
 
-      if (response.data) {
-        setExpenseData(response.data as ExpenseData[]);
+      if (response.data && response.data.items) {
+        setExpenseData(response.data.items as ExpenseData[]);
       }
     } catch (error) {
       console.log("Something went wrong. Please try again.", error);

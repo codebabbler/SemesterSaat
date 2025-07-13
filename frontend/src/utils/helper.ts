@@ -38,20 +38,27 @@ export const addThousandsSeparator = (num: number | string): string => {
 };
 
 interface ExpenseData {
+  _id: string;
   category: string;
   amount: number;
+  date: string;
+  icon?: string;
 }
 
 interface IncomeData {
-  date: string;
-  amount: number;
+  _id: string;
   source: string;
+  amount: number;
+  date: string;
+  icon?: string;
 }
 
 interface ExpenseLineData {
-  date: string;
-  amount: number;
+  _id: string;
   category: string;
+  amount: number;
+  date: string;
+  icon?: string;
 }
 
 export const prepareExpenseBarChartData = (data: ExpenseData[] = []) => {

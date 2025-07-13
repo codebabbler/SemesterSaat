@@ -6,9 +6,11 @@ import CustomBarChart from "~/components/Charts/CustomBarChart";
 import { prepareIncomeBarChartData } from "~/utils/helper";
 
 interface Transaction {
-  date: string;
-  amount: number;
+  _id: string;
   source: string;
+  amount: number;
+  date: string;
+  icon?: string;
 }
 
 interface ChartData {

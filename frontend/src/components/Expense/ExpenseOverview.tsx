@@ -6,9 +6,11 @@ import CustomLineChart from "~/components/Charts/CustomLineChart";
 import { prepareExpenseLineChartData } from "~/utils/helper";
 
 interface Transaction {
-  date: string;
-  amount: number;
+  _id: string;
   category: string;
+  amount: number;
+  date: string;
+  icon?: string;
 }
 
 interface ChartData {
