@@ -21,5 +21,6 @@ router.route("/refresh-token").get(refreshAccessToken);
 router.route("/profile").get(verifyJWT, getUserProfile);
 router.route("/profile").put(verifyJWT, updateUserProfile);
 router.route("/change-password").post(verifyJWT, changePassword);
+router.route("/change-password").post(verifyJWT, changePassword);
 
 export default router;
