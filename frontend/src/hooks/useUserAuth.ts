@@ -8,6 +8,7 @@ interface User {
   id: string;
   email: string;
   fullName: string;
+  username: string;
   profileImageUrl?: string;
 }
 
@@ -27,10 +28,13 @@ export const useUserAuth = () => {
 
     const fetchUserInfo = async () => {
       try {
-        const response = await axiosInstance.get(API_PATHS.AUTH.GET_USER_INFO);
+        const response = await axiosInstance.get(API_PATHS.AUTH.PROFILE);
         
-        if (isMounted && response.data) {
-          updateUser(response.data as User);
+        if (isMounted && response.data?.data) {
+          // Convert _id to id for frontend compatibility
+          const userData = response.data.data;
+          const userWithId = { ...userData, id: userData._id };
+          updateUser(userWithId as User);
         }
       } catch (error) {
         console.error("Failed to fetch user info:", error);

@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import EmojiPicker from "emoji-picker-react";
-import Image from "next/image";
 import { LuImage, LuX } from "react-icons/lu";
 
 interface EmojiPickerPopupProps {
@@ -21,7 +20,7 @@ const EmojiPickerPopup: React.FC<EmojiPickerPopupProps> = ({ icon, onSelect }) =
       >
         <div className="w-12 h-12 flex items-center justify-center text-2xl bg-purple-50 text-primary rounded-lg">
           {icon ? (
-            <Image src={icon} alt="Icon" width={48} height={48} className="w-12 h-12" />
+            <img src={icon} alt="Icon" className="w-12 h-12 object-cover rounded" />
           ) : (
             <LuImage />
           )}

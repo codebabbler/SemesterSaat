@@ -6,7 +6,8 @@ import { SIDE_MENU_DATA } from "~/utils/data";
 import { useRouter } from "next/navigation";
 import { UserContext } from "~/context/UserContext";
 import CharAvatar from "~/components/Cards/CharAvatar";
-import { safeLocalStorage } from "~/utils/localStorage";
+import axiosInstance from "~/utils/axiosInstance";
+import { API_PATHS } from "~/utils/apiPaths";
 
 interface SideMenuProps {
   activeMenu: string;
@@ -30,10 +31,17 @@ const SideMenu: React.FC<SideMenuProps> = ({ activeMenu }) => {
     router.push(route);
   };
 
-  const handelLogout = () => {
-    safeLocalStorage.clear();
-    clearUser();
-    router.push("/login");
+  const handelLogout = async () => {
+    try {
+      // Call backend logout endpoint to clear HTTP-only cookies
+      await axiosInstance.post(API_PATHS.AUTH.LOGOUT);
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      // Always clear frontend state and redirect
+      clearUser();
+      router.push("/login");
+    }
   };
 
   // Separate menu items and logout

@@ -9,12 +9,12 @@ import { validateEmail } from "~/utils/helper";
 import axiosInstance from "~/utils/axiosInstance";
 import { API_PATHS } from "~/utils/apiPaths";
 import { UserContext } from "~/context/UserContext";
-import { safeLocalStorage } from "~/utils/localStorage";
 
 interface User {
-  id: string;
+  _id: string;
   email: string;
   fullName: string;
+  username: string;
   profileImageUrl?: string;
 }
 
@@ -52,11 +52,12 @@ const LoginForm = () => {
         email,
         password,
       });
-      const { token, user } = response.data as { token: string; user: User };
+      const { data } = response.data as { data: { user: User; accessToken: string; refreshToken: string } };
 
-      if (token) {
-        safeLocalStorage.setItem("token", token);
-        updateUser(user);
+      if (data.user) {
+        // Convert _id to id for frontend compatibility
+        const userWithId = { ...data.user, id: data.user._id };
+        updateUser(userWithId);
         router.push("/dashboard");
       }
     } catch (error: unknown) {

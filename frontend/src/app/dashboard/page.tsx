@@ -20,36 +20,73 @@ import RecentIncome from "~/components/Dashboard/RecentIncome";
 import RecentIncomeWithChart from "~/components/Dashboard/RecentIncomeWithChart";
 
 interface DashboardData {
-  totalBalance: number;
-  totalIncome: number;
-  totalExpenses: number;
+  summary: {
+    totalBalance: number;
+    totalIncome: number;
+    totalExpenses: number;
+    savingsRate: number;
+  };
+  last30Days: {
+    total: number;
+    count: number;
+    average: number;
+    transactions: Array<{
+      _id: string;
+      userId: string;
+      icon?: string;
+      source: string;
+      amount: number;
+      date: string;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+  last60Days: {
+    total: number;
+    count: number;
+    average: number;
+    transactions: Array<{
+      _id: string;
+      userId: string;
+      icon?: string;
+      source: string;
+      amount: number;
+      date: string;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
   recentTransactions: Array<{
     _id: string;
+    userId: string;
+    icon?: string;
+    amount: number;
+    date: string;
+    createdAt: string;
+    updatedAt: string;
     type: "income" | "expense";
     category?: string;
     source?: string;
-    icon?: string;
-    date: string;
-    amount: number;
   }>;
-  last30DaysExpenses: {
-    transactions: Array<{
-      _id: string;
-      category: string;
-      icon?: string;
-      date: string;
-      amount: number;
-    }>;
-  };
-  last60DaysIncome: {
-    transactions: Array<{
-      _id: string;
-      source: string;
-      icon?: string;
-      date: string;
-      amount: number;
-    }>;
-  };
+  topExpenseCategories: Array<{
+    name: string;
+    amount: number;
+    percentage: number;
+    count: number;
+  }>;
+  topIncomeSource: Array<{
+    name: string;
+    amount: number;
+    percentage: number;
+    count: number;
+  }>;
+  monthlyTrends: Array<{
+    year: number;
+    month: number;
+    income: number;
+    expenses: number;
+    balance: number;
+  }>;
 }
 
 const Dashboard = () => {
@@ -57,7 +94,9 @@ const Dashboard = () => {
 
   const router = useRouter();
 
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
 
   const fetchDashboardData = async () => {
@@ -66,12 +105,12 @@ const Dashboard = () => {
     setLoading(true);
 
     try {
-      const response = await axiosInstance.get(
-        `${API_PATHS.DASHBOARD.GET_DATA}`
-      );
+      const response = await axiosInstance.get<{
+        data: DashboardData;
+      }>(`${API_PATHS.DASHBOARD.GET_DATA}`);
 
-      if (response.data) {
-        setDashboardData(response.data as DashboardData);
+      if (response.data?.data) {
+        setDashboardData(response.data.data);
       }
     } catch (error) {
       console.log("Something went wrong. Please try again.", error);
@@ -84,60 +123,90 @@ const Dashboard = () => {
     void fetchDashboardData();
   }, []);
 
+  useEffect(() => {
+    console.log({ dashboardData });
+  }, [dashboardData]);
+
+  // Create expense transactions for the ExpenseTransactions component
+  const expenseTransactions =
+    dashboardData?.recentTransactions
+      ?.filter((transaction) => transaction.type === "expense")
+      ?.map((transaction) => ({
+        _id: transaction._id,
+        category: transaction.category ?? "Unknown",
+        icon: transaction.icon,
+        date: transaction.date,
+        amount: transaction.amount,
+      })) ?? [];
+
+  // Create expense data for the Last30DaysExpenses component from topExpenseCategories
+  const expenseData =
+    dashboardData?.topExpenseCategories?.map((category) => ({
+      _id: category.name,
+      category: category.name,
+      amount: category.amount,
+      date: new Date().toISOString(), // Using current date as placeholder
+      icon: "",
+    })) ?? [];
+
   return (
     <DashboardLayout activeMenu="Dashboard">
-      <div className="my-5 mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="mx-auto my-5">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <InfoCard
             icon={<IoMdCard />}
             label="Total Balance"
-            value={addThousandsSeparator(dashboardData?.totalBalance ?? 0)}
+            value={addThousandsSeparator(
+              dashboardData?.summary?.totalBalance ?? 0,
+            )}
             color="bg-primary"
           />
 
           <InfoCard
             icon={<LuWalletMinimal />}
             label="Total Income"
-            value={addThousandsSeparator(dashboardData?.totalIncome ?? 0)}
+            value={addThousandsSeparator(
+              dashboardData?.summary?.totalIncome ?? 0,
+            )}
             color="bg-orange-500"
           />
 
           <InfoCard
             icon={<LuHandCoins />}
             label="Total Expenses"
-            value={addThousandsSeparator(dashboardData?.totalExpenses ?? 0)}
+            value={addThousandsSeparator(
+              dashboardData?.summary?.totalExpenses ?? 0,
+            )}
             color="bg-red-500"
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
           <RecentTransactions
             transactions={dashboardData?.recentTransactions ?? []}
             onSeeMore={() => router.push("/expense")}
           />
 
           <FinanceOverview
-            totalBalance={dashboardData?.totalBalance ?? 0}
-            totalIncome={dashboardData?.totalIncome ?? 0}
-            totalExpense={dashboardData?.totalExpenses ?? 0}
+            totalBalance={dashboardData?.summary?.totalBalance ?? 0}
+            totalIncome={dashboardData?.summary?.totalIncome ?? 0}
+            totalExpense={dashboardData?.summary?.totalExpenses ?? 0}
           />
 
           <ExpenseTransactions
-            transactions={dashboardData?.last30DaysExpenses?.transactions ?? []}
+            transactions={expenseTransactions}
             onSeeMore={() => router.push("/expense")}
           />
 
-          <Last30DaysExpenses
-            data={dashboardData?.last30DaysExpenses?.transactions ?? []}
-          />
+          <Last30DaysExpenses data={expenseData} />
 
           <RecentIncomeWithChart
-            data={dashboardData?.last60DaysIncome?.transactions?.slice(0,4) ?? []}
-            totalIncome={dashboardData?.totalIncome ?? 0}
+            data={dashboardData?.last60Days?.transactions?.slice(0, 4) ?? []}
+            totalIncome={dashboardData?.summary?.totalIncome ?? 0}
           />
 
           <RecentIncome
-            transactions={dashboardData?.last60DaysIncome?.transactions ?? []}
+            transactions={dashboardData?.last60Days?.transactions ?? []}
             onSeeMore={() => router.push("/income")}
           />
         </div>

@@ -7,7 +7,6 @@ export const validateEmail = (email: string): boolean => {
 
 export const getInitials = (name: string): string => {
   if (!name) return "";
-
   const words = name.split(" ");
   let initials = "";
 
@@ -23,13 +22,11 @@ export const getInitials = (name: string): string => {
 
 export const addThousandsSeparator = (num: number | string): string => {
   if (num == null || isNaN(Number(num))) return "";
-
   const parts = num.toString().split(".");
   const integerPart = parts[0];
   const fractionalPart = parts[1];
 
   if (!integerPart) return "";
-
   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
   return fractionalPart
