@@ -104,3 +104,41 @@ export interface CashFlowResponse {
   expenses: CashFlowData[];
   netFlow: NetFlowData[];
 }
+
+// Anomaly Detection interfaces
+export interface AnomalyAlert {
+  _id: string;
+  transactionId: string;
+  type: 'expense' | 'income';
+  amount: number;
+  category?: string;
+  source?: string;
+  date: Date;
+  zScore: number;
+  severity: 'critical' | 'warning' | 'info';
+  confidence: 'high' | 'medium' | 'low';
+  message: string;
+  isResolved: boolean;
+  createdAt: Date;
+}
+
+export interface AnomalyStatistics {
+  totalAnomalies: number;
+  criticalAnomalies: number;
+  warningAnomalies: number;
+  unresolvedAnomalies: number;
+  mostAnomalousCategory: {
+    name: string;
+    count: number;
+  } | null;
+  averageZScore: number;
+}
+
+export interface TransactionWithAnomaly extends TransactionWithType {
+  anomalyAlert?: AnomalyAlert;
+}
+
+export interface DashboardResponseWithAnomalies extends DashboardResponse {
+  anomalyAlerts: AnomalyAlert[];
+  anomalyStatistics: AnomalyStatistics;
+}
