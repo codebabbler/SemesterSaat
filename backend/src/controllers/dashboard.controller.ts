@@ -4,12 +4,17 @@ import ApiErrors from "../utils/ApiErrors";
 import ApiResponse from "../utils/ApiResponse";
 import Income from "../models/income.models";
 import Expense from "../models/expense.models";
+import AnomalyAlert from "../models/anomalyAlert.models";
+import AnomalyDetector from "../utils/anomalyDetector";
 import { AuthenticatedRequest } from "../types/common.types";
 import {
   TransactionWithType,
   CategoryBreakdown,
   MonthlyTrend,
   DashboardResponse,
+  DashboardResponseWithAnomalies,
+  AnomalyAlert as AnomalyAlertType,
+  AnomalyStatistics,
 } from "../types/dashboard.types";
 import { Types } from "mongoose";
 
@@ -277,7 +282,124 @@ const getDashboardData = asyncHandler(
         .sort({ date: -1 })
         .select("-__v");
 
-      const dashboardData: DashboardResponse = {
+      // Initialize anomaly detector
+      const anomalyDetector = new AnomalyDetector({
+        minTransactions: 10,
+        zScoreThreshold: 2.5,
+        criticalThreshold: 4.0,
+        warningThreshold: 2.5
+      });
+
+      // Get all historical transactions for anomaly analysis
+      const [allHistoricalExpenses, allHistoricalIncome] = await Promise.all([
+        Expense.find({ userId }).select("-__v"),
+        Income.find({ userId }).select("-__v")
+      ]);
+
+      // Check recent transactions for anomalies and create alerts
+      const anomalyPromises: Promise<any>[] = [];
+
+      // Analyze recent expense transactions
+      for (const expense of recentExpenseTransactions) {
+        const anomalyResult = anomalyDetector.detectExpenseAnomaly(
+          {
+            amount: expense.amount,
+            category: expense.category,
+            date: expense.date,
+            _id: expense._id.toString()
+          },
+          allHistoricalExpenses.map(e => ({
+            amount: e.amount,
+            category: e.category,
+            date: e.date,
+            _id: e._id.toString()
+          }))
+        );
+
+        if (anomalyResult.isAnomaly) {
+          // Check if alert already exists
+          const existingAlert = await AnomalyAlert.findOne({
+            userId,
+            transactionId: expense._id
+          });
+
+          if (!existingAlert) {
+            anomalyPromises.push(
+              AnomalyAlert.create({
+                userId,
+                transactionId: expense._id,
+                type: 'expense',
+                amount: expense.amount,
+                category: expense.category,
+                date: expense.date,
+                zScore: anomalyResult.zScore,
+                severity: anomalyResult.severity,
+                confidence: anomalyResult.confidence,
+                message: anomalyResult.message,
+                isResolved: false
+              })
+            );
+          }
+        }
+      }
+
+      // Analyze recent income transactions
+      for (const income of recentIncomeTransactions) {
+        const anomalyResult = anomalyDetector.detectIncomeAnomaly(
+          {
+            amount: income.amount,
+            source: income.source,
+            date: income.date,
+            _id: income._id.toString()
+          },
+          allHistoricalIncome.map(i => ({
+            amount: i.amount,
+            source: i.source,
+            date: i.date,
+            _id: i._id.toString()
+          }))
+        );
+
+        if (anomalyResult.isAnomaly) {
+          // Check if alert already exists
+          const existingAlert = await AnomalyAlert.findOne({
+            userId,
+            transactionId: income._id
+          });
+
+          if (!existingAlert) {
+            anomalyPromises.push(
+              AnomalyAlert.create({
+                userId,
+                transactionId: income._id,
+                type: 'income',
+                amount: income.amount,
+                source: income.source,
+                date: income.date,
+                zScore: anomalyResult.zScore,
+                severity: anomalyResult.severity,
+                confidence: anomalyResult.confidence,
+                message: anomalyResult.message,
+                isResolved: false
+              })
+            );
+          }
+        }
+      }
+
+      // Create any new anomaly alerts
+      await Promise.all(anomalyPromises);
+
+      // Get current anomaly alerts and statistics
+      const [recentAnomalyAlerts, anomalyStatistics] = await Promise.all([
+        AnomalyAlert.find({ userId })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .select("-__v"),
+        AnomalyAlert.getStatistics(userId.toString())
+      ]);
+
+      const dashboardData: DashboardResponseWithAnomalies = {
         summary: {
           totalBalance,
           totalIncome,
@@ -300,6 +422,29 @@ const getDashboardData = asyncHandler(
         topExpenseCategories: processedExpenseCategories,
         topIncomeSource: processedIncomeSources,
         monthlyTrends: combinedMonthlyTrends.slice(-12), // Last 12 months
+        anomalyAlerts: recentAnomalyAlerts.map((alert: any) => ({
+          _id: alert._id.toString(),
+          transactionId: alert.transactionId.toString(),
+          type: alert.type,
+          amount: alert.amount,
+          category: alert.category,
+          source: alert.source,
+          date: alert.date,
+          zScore: alert.zScore,
+          severity: alert.severity,
+          confidence: alert.confidence,
+          message: alert.message,
+          isResolved: alert.isResolved,
+          createdAt: alert.createdAt
+        })),
+        anomalyStatistics: {
+          totalAnomalies: anomalyStatistics.totalAnomalies || 0,
+          criticalAnomalies: anomalyStatistics.criticalAnomalies || 0,
+          warningAnomalies: anomalyStatistics.warningAnomalies || 0,
+          unresolvedAnomalies: anomalyStatistics.unresolvedAnomalies || 0,
+          mostAnomalousCategory: anomalyStatistics.mostAnomalousCategory,
+          averageZScore: anomalyStatistics.avgZScore || 0
+        }
       };
 
       res.status(200).json(

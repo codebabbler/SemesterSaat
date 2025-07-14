@@ -2,6 +2,9 @@ import asyncHandler from "../utils/asyncHandler";
 import ApiErrors from "../utils/ApiErrors";
 import User from "../models/user.models";
 import type { IUser } from "../models/user.models";
+import Expense from "../models/expense.models";
+import Income from "../models/income.models";
+import AnomalyAlert from "../models/anomalyAlert.models";
 import ApiResponse from "../utils/ApiResponse";
 import JWT from "jsonwebtoken";
 import { Response } from "express";
@@ -267,6 +270,45 @@ const updateUserProfile = asyncHandler(
   }
 );
 
+const deleteUser = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const userId = req.user._id;
+    
+    try {
+      // Delete all user's expenses
+      await Expense.deleteMany({ userId });
+      
+      // Delete all user's incomes
+      await Income.deleteMany({ userId });
+      
+      // Delete all user's anomaly alerts
+      await AnomalyAlert.deleteMany({ userId });
+      
+      // Finally, delete the user
+      await User.findByIdAndDelete(userId);
+      
+      // Clear cookies
+      const options = {
+        httpOnly: true,
+        secure: true,
+      };
+      
+      res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new ApiResponse(200, null, "User and all related data deleted successfully"));
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      throw new ApiErrors(500, "Failed to delete user and related data");
+    }
+  }
+);
+
 export {
   registerUser,
   loginUser,
@@ -275,5 +317,6 @@ export {
   changePassword,
   getUserProfile,
   updateUserProfile,
+  deleteUser,
   IUser,
 };

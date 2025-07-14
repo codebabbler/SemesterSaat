@@ -27,9 +27,9 @@ const addExpense = asyncHandler(
       throw new ApiErrors(400, "Category, amount, and date are required");
     }
 
-    // Validate amount is a positive number
-    if (typeof amount !== "number" || amount <= 0) {
-      throw new ApiErrors(400, "Amount must be a positive number");
+    // Validate amount is a non-negative number
+    if (typeof amount !== "number" || amount < 0) {
+      throw new ApiErrors(400, "Amount must be a non-negative number");
     }
 
     // Validate date
