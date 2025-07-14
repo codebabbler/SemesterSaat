@@ -91,7 +91,7 @@ const getAllExpenses = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc" } = req.query;
+    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc", predictive = "false" } = req.query;
 
     // Validate pagination parameters
     const pageNum = parseInt(page as string);
@@ -104,13 +104,21 @@ const getAllExpenses = asyncHandler(
     const skip = (pageNum - 1) * limitNum;
     const sortDirection = sortOrder === "asc" ? 1 : -1;
 
-    const expenses = await Expense.find({ userId: req.user._id })
+    // Build query filter
+    const filter: any = { userId: req.user._id };
+    
+    // If not in predictive mode, filter out future dates
+    if (predictive !== "true") {
+      filter.date = { $lte: new Date() };
+    }
+
+    const expenses = await Expense.find(filter)
       .sort({ [sortBy as string]: sortDirection })
       .skip(skip)
       .limit(limitNum)
       .select("-__v");
 
-    const totalCount = await Expense.countDocuments({ userId: req.user._id });
+    const totalCount = await Expense.countDocuments(filter);
 
     res.status(200).json(
       new ApiResponse(

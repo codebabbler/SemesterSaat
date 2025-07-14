@@ -20,8 +20,12 @@ const getDashboardData = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { period = 30, limit = 5 } = req.query;
+    const { period = 30, limit = 5, predictive = "false" } = req.query;
     const userId = new Types.ObjectId(req.user._id);
+    
+    // Date filter for current vs predictive mode
+    const currentDate = new Date();
+    const dateFilter = predictive === "true" ? {} : { date: { $lte: currentDate } };
 
     // Validate query parameters
     const periodDays = parseInt(period as string);
@@ -50,13 +54,13 @@ const getDashboardData = asyncHandler(
       ] = await Promise.all([
         // Total income
         Income.aggregate([
-          { $match: { userId } },
+          { $match: { userId, ...dateFilter } },
           { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
         ]),
 
         // Total expenses
         Expense.aggregate([
-          { $match: { userId } },
+          { $match: { userId, ...dateFilter } },
           { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
         ]),
 
@@ -97,20 +101,20 @@ const getDashboardData = asyncHandler(
         ]),
 
         // Recent income transactions
-        Income.find({ userId })
+        Income.find({ userId, ...dateFilter })
           .sort({ date: -1 })
           .limit(limitNum)
           .select("-__v"),
 
         // Recent expense transactions
-        Expense.find({ userId })
+        Expense.find({ userId, ...dateFilter })
           .sort({ date: -1 })
           .limit(limitNum)
           .select("-__v"),
 
         // Top expense categories
         Expense.aggregate([
-          { $match: { userId } },
+          { $match: { userId, ...dateFilter } },
           {
             $group: {
               _id: "$category",
@@ -124,7 +128,7 @@ const getDashboardData = asyncHandler(
 
         // Top income sources
         Income.aggregate([
-          { $match: { userId } },
+          { $match: { userId, ...dateFilter } },
           {
             $group: {
               _id: "$source",
@@ -263,17 +267,23 @@ const getDashboardData = asyncHandler(
       });
 
       // Get last 30 and 60 days transaction details
-      const last30DaysIncomeTransactions = await Income.find({
+      const last30DaysFilter = {
         userId,
         date: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-      })
+        ...(predictive !== "true" && { date: { ...{ $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }, $lte: currentDate } })
+      };
+      
+      const last60DaysFilter = {
+        userId,
+        date: { $gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) },
+        ...(predictive !== "true" && { date: { ...{ $gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) }, $lte: currentDate } })
+      };
+
+      const last30DaysIncomeTransactions = await Income.find(last30DaysFilter)
         .sort({ date: -1 })
         .select("-__v");
 
-      const last60DaysIncomeTransactions = await Income.find({
-        userId,
-        date: { $gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) },
-      })
+      const last60DaysIncomeTransactions = await Income.find(last60DaysFilter)
         .sort({ date: -1 })
         .select("-__v");
 
