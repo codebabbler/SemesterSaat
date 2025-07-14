@@ -16,7 +16,7 @@ const addIncome = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { icon, source, amount, date } = req.body;
+    const { icon, source, amount, date, isRecurring, recurringPeriod } = req.body;
 
     // Validation: Check for missing fields
     if (
@@ -38,12 +38,44 @@ const addIncome = asyncHandler(
       throw new ApiErrors(400, "Invalid date format");
     }
 
+    // Validate recurring fields
+    if (isRecurring && !recurringPeriod) {
+      throw new ApiErrors(400, "Recurring period is required for recurring income");
+    }
+
+    if (isRecurring && !["daily", "weekly", "monthly", "yearly"].includes(recurringPeriod)) {
+      throw new ApiErrors(400, "Invalid recurring period");
+    }
+
+    // Calculate next recurring date
+    let nextRecurringDate: Date | undefined;
+    if (isRecurring && recurringPeriod) {
+      const baseDate = new Date(parsedDate);
+      switch (recurringPeriod) {
+        case "daily":
+          nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 1));
+          break;
+        case "weekly":
+          nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 7));
+          break;
+        case "monthly":
+          nextRecurringDate = new Date(baseDate.setMonth(baseDate.getMonth() + 1));
+          break;
+        case "yearly":
+          nextRecurringDate = new Date(baseDate.setFullYear(baseDate.getFullYear() + 1));
+          break;
+      }
+    }
+
     const newIncome = await Income.create({
       userId: req.user._id,
       icon: icon || "",
       source: source.trim(),
       amount,
       date: parsedDate,
+      isRecurring: isRecurring || false,
+      recurringPeriod: isRecurring ? recurringPeriod : undefined,
+      nextRecurringDate,
     });
 
     res.status(201).json(
@@ -131,7 +163,7 @@ const updateIncome = asyncHandler(
     }
 
     const { id } = req.params;
-    const { icon, source, amount, date } = req.body;
+    const { icon, source, amount, date, isRecurring, recurringPeriod } = req.body;
 
     if (!id) {
       throw new ApiErrors(400, "Income ID is required");
@@ -159,6 +191,37 @@ const updateIncome = asyncHandler(
         throw new ApiErrors(400, "Invalid date format");
       }
       updateData.date = parsedDate;
+    }
+    if (isRecurring !== undefined) {
+      updateData.isRecurring = isRecurring;
+      if (isRecurring && !recurringPeriod) {
+        throw new ApiErrors(400, "Recurring period is required for recurring income");
+      }
+    }
+    if (recurringPeriod !== undefined) {
+      if (!["daily", "weekly", "monthly", "yearly"].includes(recurringPeriod)) {
+        throw new ApiErrors(400, "Invalid recurring period");
+      }
+      updateData.recurringPeriod = recurringPeriod;
+      
+      // Recalculate next recurring date if recurring
+      if (updateData.isRecurring || (updateData.isRecurring === undefined && isRecurring)) {
+        const baseDate = new Date(updateData.date || date);
+        switch (recurringPeriod) {
+          case "daily":
+            updateData.nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 1));
+            break;
+          case "weekly":
+            updateData.nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 7));
+            break;
+          case "monthly":
+            updateData.nextRecurringDate = new Date(baseDate.setMonth(baseDate.getMonth() + 1));
+            break;
+          case "yearly":
+            updateData.nextRecurringDate = new Date(baseDate.setFullYear(baseDate.getFullYear() + 1));
+            break;
+        }
+      }
     }
 
     const updatedIncome = await Income.findOneAndUpdate(

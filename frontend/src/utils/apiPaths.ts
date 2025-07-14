@@ -35,4 +35,7 @@ export const API_PATHS = {
     MONTHLY_TRENDS: "/api/v1/expense/trends/monthly",
     BY_CATEGORY: (category: string) => `/api/v1/expense/category/${category}`,
   },
+  IMAGE: {
+    UPLOAD_IMAGE: "/api/v1/upload/image",
+  },
 };

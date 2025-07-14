@@ -8,6 +8,9 @@ interface IExpense extends Document {
   category: string;
   amount: number;
   date: Date;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
+  nextRecurringDate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +36,23 @@ const expenseSchema = new Schema(
     date: {
       type: Date,
       default: Date.now,
+    },
+    isRecurring: {
+      type: Boolean,
+      default: false,
+    },
+    recurringPeriod: {
+      type: String,
+      enum: ["daily", "weekly", "monthly", "yearly"],
+      required: function(this: IExpense) {
+        return this.isRecurring;
+      },
+    },
+    nextRecurringDate: {
+      type: Date,
+      required: function(this: IExpense) {
+        return this.isRecurring;
+      },
     },
   },
   { timestamps: true }

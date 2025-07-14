@@ -10,6 +10,8 @@ interface IncomeData {
   amount: string;
   date: string;
   icon: string;
+  isRecurring: boolean;
+  recurringPeriod: "daily" | "weekly" | "monthly" | "yearly" | "";
 }
 
 interface AddIncomeFormProps {
@@ -22,9 +24,11 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
     amount: "",
     date: "",
     icon: "",
+    isRecurring: false,
+    recurringPeriod: "",
   });
 
-  const handleChange = (key: keyof IncomeData, value: string) => 
+  const handleChange = (key: keyof IncomeData, value: string | boolean) => 
     setIncome({ ...income, [key]: value });
 
   return (
@@ -56,6 +60,37 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
         label="Date"
         placeholder="Select income date"
       />
+
+      <div className="mt-4">
+        <label className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={income.isRecurring}
+            onChange={(e) => handleChange("isRecurring", e.target.checked)}
+            className="form-checkbox h-4 w-4 text-blue-600"
+          />
+          <span className="text-sm font-medium text-gray-700">Recurring Income</span>
+        </label>
+      </div>
+
+      {income.isRecurring && (
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Recurring Period
+          </label>
+          <select
+            value={income.recurringPeriod}
+            onChange={(e) => handleChange("recurringPeriod", e.target.value)}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">Select period</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </div>
+      )}
 
       <div className="flex justify-end mt-6">
         <button

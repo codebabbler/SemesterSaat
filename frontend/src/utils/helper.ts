@@ -37,18 +37,25 @@ export const addThousandsSeparator = (num: number | string): string => {
 interface ExpenseData {
   category: string;
   amount: number;
+  date: string;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
 }
 
 interface IncomeData {
   date: string;
   amount: number;
   source: string;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
 }
 
 interface ExpenseLineData {
   date: string;
   amount: number;
   category: string;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
 }
 
 export const prepareExpenseBarChartData = (data: ExpenseData[] = []) => {
