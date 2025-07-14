@@ -35,7 +35,7 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
   return (
     <div className="group relative mt-2 flex items-center gap-4 rounded-lg p-3 hover:bg-gray-100/60">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-800">
-        {icon ? (
+        {icon && icon.trim() !== "" && (icon.startsWith('http') || icon.startsWith('/')) ? (
           <Image
             src={icon}
             alt={title}

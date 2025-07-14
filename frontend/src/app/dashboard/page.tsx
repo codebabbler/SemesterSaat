@@ -18,6 +18,35 @@ import ExpenseTransactions from "~/components/Dashboard/ExpenseTransactions";
 import Last30DaysExpenses from "~/components/Dashboard/Last30DaysExpenses";
 import RecentIncome from "~/components/Dashboard/RecentIncome";
 import RecentIncomeWithChart from "~/components/Dashboard/RecentIncomeWithChart";
+import AnomalyAlerts from "~/components/Dashboard/AnomalyAlerts";
+
+interface AnomalyAlert {
+  _id: string;
+  transactionId: string;
+  type: "income" | "expense";
+  amount: number;
+  category?: string;
+  source?: string;
+  date: string;
+  zScore: number;
+  severity: "critical" | "warning" | "info";
+  confidence: "high" | "medium" | "low";
+  message: string;
+  isResolved: boolean;
+  createdAt: string;
+}
+
+interface AnomalyStatistics {
+  totalAnomalies: number;
+  criticalAnomalies: number;
+  warningAnomalies: number;
+  unresolvedAnomalies: number;
+  mostAnomalousCategory: {
+    name: string;
+    count: number;
+  } | null;
+  averageZScore: number;
+}
 
 interface DashboardData {
   summary: {
@@ -87,6 +116,8 @@ interface DashboardData {
     expenses: number;
     balance: number;
   }>;
+  anomalyAlerts: AnomalyAlert[];
+  anomalyStatistics: AnomalyStatistics;
 }
 
 const Dashboard = () => {
@@ -98,6 +129,26 @@ const Dashboard = () => {
     null,
   );
   const [loading, setLoading] = useState(false);
+
+  const handleResolveAlert = async (alertId: string) => {
+    try {
+      await axiosInstance.patch(API_PATHS.ANOMALY.RESOLVE_ALERT(alertId));
+      // Refresh dashboard data to update the alerts
+      await fetchDashboardData();
+    } catch (error) {
+      console.error("Error resolving alert:", error);
+    }
+  };
+
+  const handleDismissAlert = async (alertId: string) => {
+    try {
+      await axiosInstance.delete(API_PATHS.ANOMALY.DELETE_ALERT(alertId));
+      // Refresh dashboard data to update the alerts
+      await fetchDashboardData();
+    } catch (error) {
+      console.error("Error dismissing alert:", error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     if (loading) return;
@@ -152,6 +203,18 @@ const Dashboard = () => {
   return (
     <DashboardLayout activeMenu="Dashboard">
       <div className="mx-auto my-5">
+        {/* Anomaly Alerts Section */}
+        {dashboardData?.anomalyAlerts && (
+          <div className="mb-6">
+            <AnomalyAlerts
+              alerts={dashboardData.anomalyAlerts}
+              statistics={dashboardData.anomalyStatistics}
+              onResolveAlert={handleResolveAlert}
+              onDismissAlert={handleDismissAlert}
+            />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <InfoCard
             icon={<IoMdCard />}

@@ -35,4 +35,13 @@ export const API_PATHS = {
     MONTHLY_TRENDS: "/api/v1/expense/trends/monthly",
     BY_CATEGORY: (category: string) => `/api/v1/expense/category/${category}`,
   },
+  ANOMALY: {
+    GET_ALERTS: "/api/v1/anomaly/alerts",
+    GET_STATISTICS: "/api/v1/anomaly/statistics",
+    GET_TRENDS: "/api/v1/anomaly/trends",
+    RESOLVE_ALERT: (alertId: string) => `/api/v1/anomaly/alerts/${alertId}/resolve`,
+    UNRESOLVE_ALERT: (alertId: string) => `/api/v1/anomaly/alerts/${alertId}/unresolve`,
+    DELETE_ALERT: (alertId: string) => `/api/v1/anomaly/alerts/${alertId}`,
+    BULK_RESOLVE: "/api/v1/anomaly/alerts/bulk/resolve",
+  },
 };
