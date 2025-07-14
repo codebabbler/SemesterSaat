@@ -10,6 +10,9 @@ interface Income {
   icon?: string;
   date: string;
   amount: number;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
+  isVirtual?: boolean;
 }
 
 interface ChartData {

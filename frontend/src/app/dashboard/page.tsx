@@ -140,15 +140,8 @@ const Dashboard = () => {
         amount: transaction.amount,
       })) ?? [];
 
-  // Create expense data for the Last30DaysExpenses component from topExpenseCategories
-  const expenseData =
-    dashboardData?.topExpenseCategories?.map((category) => ({
-      _id: category.name,
-      category: category.name,
-      amount: category.amount,
-      date: new Date().toISOString(), // Using current date as placeholder
-      icon: "",
-    })) ?? [];
+  // Create expense data for the Last30DaysExpenses component from recent expense transactions
+  const expenseData = expenseTransactions ?? [];
 
   return (
     <DashboardLayout activeMenu="Dashboard">

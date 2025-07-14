@@ -10,6 +10,9 @@ interface ExpenseData {
   amount: number;
   date: string;
   icon?: string;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
+  isVirtual?: boolean;
 }
 
 interface Last30DaysExpensesProps {
@@ -18,7 +21,7 @@ interface Last30DaysExpensesProps {
 
 const Last30DaysExpenses: React.FC<Last30DaysExpensesProps> = ({ data }) => {
   const [chartData, setChartData] = useState<
-    { month: string; amount: number }[]
+    { month: string; amount: number; hasRecurring?: boolean; hasVirtual?: boolean }[]
   >([]);
 
   useEffect(() => {

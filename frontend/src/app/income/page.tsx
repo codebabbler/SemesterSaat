@@ -18,6 +18,10 @@ interface IncomeData {
   amount: number;
   date: string;
   icon?: string;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
+  isVirtual?: boolean;
+  originalId?: string;
 }
 
 interface IncomeFormData {

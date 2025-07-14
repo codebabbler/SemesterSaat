@@ -84,6 +84,68 @@ const addIncome = asyncHandler(
   }
 );
 
+// Helper function to generate recurring income
+const generateRecurringIncome = (baseIncome: any, endDate: Date) => {
+  const recurringIncome = [];
+  const { date, recurringPeriod, isRecurring } = baseIncome;
+  
+  if (!isRecurring || !recurringPeriod) {
+    return [];
+  }
+  
+  let currentDate = new Date(date);
+  const today = new Date();
+  
+  // If the base date is in the past, start from the next occurrence after today
+  if (currentDate < today) {
+    while (currentDate < today) {
+      switch (recurringPeriod) {
+        case "daily":
+          currentDate.setDate(currentDate.getDate() + 1);
+          break;
+        case "weekly":
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+        case "monthly":
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+        case "yearly":
+          currentDate.setFullYear(currentDate.getFullYear() + 1);
+          break;
+      }
+    }
+  }
+  
+  // Generate recurring entries up to endDate
+  while (currentDate <= endDate) {
+    recurringIncome.push({
+      ...baseIncome.toObject(),
+      _id: `${baseIncome._id}_${currentDate.getTime()}`,
+      date: new Date(currentDate),
+      isVirtual: true,
+      originalId: baseIncome._id
+    });
+    
+    // Move to next occurrence
+    switch (recurringPeriod) {
+      case "daily":
+        currentDate.setDate(currentDate.getDate() + 1);
+        break;
+      case "weekly":
+        currentDate.setDate(currentDate.getDate() + 7);
+        break;
+      case "monthly":
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        break;
+      case "yearly":
+        currentDate.setFullYear(currentDate.getFullYear() + 1);
+        break;
+    }
+  }
+  
+  return recurringIncome;
+};
+
 // Get All Income (For Logged-in User)
 const getAllIncome = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -114,17 +176,42 @@ const getAllIncome = asyncHandler(
 
     const income = await Income.find(filter)
       .sort({ [sortBy as string]: sortDirection })
-      .skip(skip)
-      .limit(limitNum)
       .select("-__v");
 
-    const totalCount = await Income.countDocuments(filter);
+    let allIncome = [...income];
+    
+    // Generate recurring income if in predictive mode
+    if (predictive === "true") {
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 3); // Show 3 months ahead
+      
+      const recurringIncome = await Income.find({
+        userId: req.user._id,
+        isRecurring: true
+      });
+      
+      recurringIncome.forEach(income => {
+        const generated = generateRecurringIncome(income, endDate);
+        allIncome.push(...generated);
+      });
+    }
+    
+    // Sort all income
+    allIncome.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return sortDirection === 1 ? dateA - dateB : dateB - dateA;
+    });
+    
+    // Apply pagination
+    const paginatedIncome = allIncome.slice(skip, skip + limitNum);
+    const totalCount = allIncome.length;
 
     res.status(200).json(
       new ApiResponse(
         200,
         {
-          income,
+          income: paginatedIncome,
           pagination: {
             currentPage: pageNum,
             totalPages: Math.ceil(totalCount / limitNum),
