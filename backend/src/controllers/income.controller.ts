@@ -8,6 +8,7 @@ import { AuthenticatedRequest } from "../types/common.types";
 import * as xlsx from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
+import AnomalyService from "../services/anomaly.service";
 
 // Add Income
 const addIncome = asyncHandler(
@@ -46,9 +47,29 @@ const addIncome = asyncHandler(
       date: parsedDate,
     });
 
-    res.status(201).json(
-      new ApiResponse(201, newIncome, "Income added successfully")
-    );
+    // Detect anomaly for this income
+    try {
+      const anomalyResult = await AnomalyService.detectAnomaly(
+        req.user._id,
+        newIncome._id,
+        'income',
+        source.trim(),
+        amount
+      );
+      
+      res.status(201).json(
+        new ApiResponse(201, {
+          income: newIncome,
+          anomalyDetection: anomalyResult
+        }, "Income added successfully")
+      );
+    } catch (anomalyError) {
+      console.error('Anomaly detection failed:', anomalyError);
+      // Still return success for income creation even if anomaly detection fails
+      res.status(201).json(
+        new ApiResponse(201, newIncome, "Income added successfully (anomaly detection unavailable)")
+      );
+    }
   }
 );
 

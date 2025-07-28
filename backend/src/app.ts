@@ -26,10 +26,12 @@ import authRouter from "./routes/user.routes";
 import dashboardRouter from "./routes/dashboard.routes";
 import expenseRouter from "./routes/expense.routes";
 import incomeRouter from "./routes/income.routes";
+import anomalyRouter from "./routes/anomaly.routes";
 
 app.use("/api/v1/user", authRouter);
 app.use("/api/v1/dashboard", dashboardRouter);
 app.use("/api/v1/expense", expenseRouter);
 app.use("/api/v1/income", incomeRouter);
+app.use("/api/v1/anomaly", anomalyRouter);
 
 export default app;
