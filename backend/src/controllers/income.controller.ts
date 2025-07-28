@@ -2,13 +2,9 @@ import { Response } from "express";
 import asyncHandler from "../utils/asyncHandler";
 import ApiErrors from "../utils/ApiErrors";
 import ApiResponse from "../utils/ApiResponse";
-import Income from "../models/income.models";
-import type { IIncome } from "../models/income.models";
 import { AuthenticatedRequest } from "../types/common.types";
-import * as xlsx from "xlsx";
+import IncomeService from "../services/income.service";
 import * as fs from "fs";
-import * as path from "path";
-import AnomalyService from "../services/anomaly.service";
 
 // Add Income
 const addIncome = asyncHandler(
@@ -19,57 +15,20 @@ const addIncome = asyncHandler(
 
     const { icon, source, amount, date } = req.body;
 
-    // Validation: Check for missing fields
-    if (
-      [source, amount, date].some(
-        (field) => field === undefined || field === null || field === ""
-      )
-    ) {
-      throw new ApiErrors(400, "Source, amount, and date are required");
-    }
-
-    // Validate amount is a positive number
-    if (typeof amount !== "number" || amount <= 0) {
-      throw new ApiErrors(400, "Amount must be a positive number");
-    }
-
-    // Validate date
+    // Parse date
     const parsedDate = new Date(date);
-    if (isNaN(parsedDate.getTime())) {
-      throw new ApiErrors(400, "Invalid date format");
-    }
 
-    const newIncome = await Income.create({
+    const result = await IncomeService.createIncome({
       userId: req.user._id,
-      icon: icon || "",
-      source: source.trim(),
+      icon,
+      source,
       amount,
       date: parsedDate,
     });
 
-    // Detect anomaly for this income
-    try {
-      const anomalyResult = await AnomalyService.detectAnomaly(
-        req.user._id,
-        newIncome._id,
-        'income',
-        source.trim(),
-        amount
-      );
-      
-      res.status(201).json(
-        new ApiResponse(201, {
-          income: newIncome,
-          anomalyDetection: anomalyResult
-        }, "Income added successfully")
-      );
-    } catch (anomalyError) {
-      console.error('Anomaly detection failed:', anomalyError);
-      // Still return success for income creation even if anomaly detection fails
-      res.status(201).json(
-        new ApiResponse(201, newIncome, "Income added successfully (anomaly detection unavailable)")
-      );
-    }
+    res.status(201).json(
+      new ApiResponse(201, result, "Income added successfully")
+    );
   }
 );
 
@@ -82,39 +41,19 @@ const getAllIncome = asyncHandler(
 
     const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc" } = req.query;
 
-    // Validate pagination parameters
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
+    const sortOrderTyped = sortOrder as 'asc' | 'desc';
 
-    if (pageNum < 1 || limitNum < 1) {
-      throw new ApiErrors(400, "Page and limit must be positive numbers");
-    }
-
-    const skip = (pageNum - 1) * limitNum;
-    const sortDirection = sortOrder === "asc" ? 1 : -1;
-
-    const income = await Income.find({ userId: req.user._id })
-      .sort({ [sortBy as string]: sortDirection })
-      .skip(skip)
-      .limit(limitNum)
-      .select("-__v");
-
-    const totalCount = await Income.countDocuments({ userId: req.user._id });
+    const result = await IncomeService.getAllIncome(req.user._id, {
+      page: pageNum,
+      limit: limitNum,
+      sortBy: sortBy as string,
+      sortOrder: sortOrderTyped,
+    });
 
     res.status(200).json(
-      new ApiResponse(
-        200,
-        {
-          income,
-          pagination: {
-            currentPage: pageNum,
-            totalPages: Math.ceil(totalCount / limitNum),
-            totalItems: totalCount,
-            itemsPerPage: limitNum,
-          },
-        },
-        "Income retrieved successfully"
-      )
+      new ApiResponse(200, result, "Income retrieved successfully")
     );
   }
 );
@@ -128,15 +67,7 @@ const getIncomeById = asyncHandler(
 
     const { id } = req.params;
 
-    if (!id) {
-      throw new ApiErrors(400, "Income ID is required");
-    }
-
-    const income = await Income.findOne({ _id: id, userId: req.user._id });
-
-    if (!income) {
-      throw new ApiErrors(404, "Income not found");
-    }
+    const income = await IncomeService.getIncomeById(req.user._id, id);
 
     res.status(200).json(
       new ApiResponse(200, income, "Income retrieved successfully")
@@ -154,43 +85,15 @@ const updateIncome = asyncHandler(
     const { id } = req.params;
     const { icon, source, amount, date } = req.body;
 
-    if (!id) {
-      throw new ApiErrors(400, "Income ID is required");
-    }
+    // Parse date if provided
+    const parsedDate = date ? new Date(date) : undefined;
 
-    // Build update object with only provided fields
-    const updateData: Partial<IIncome> = {};
-    
-    if (icon !== undefined) updateData.icon = icon;
-    if (source !== undefined) {
-      if (!source.trim()) {
-        throw new ApiErrors(400, "Source cannot be empty");
-      }
-      updateData.source = source.trim();
-    }
-    if (amount !== undefined) {
-      if (typeof amount !== "number" || amount <= 0) {
-        throw new ApiErrors(400, "Amount must be a positive number");
-      }
-      updateData.amount = amount;
-    }
-    if (date !== undefined) {
-      const parsedDate = new Date(date);
-      if (isNaN(parsedDate.getTime())) {
-        throw new ApiErrors(400, "Invalid date format");
-      }
-      updateData.date = parsedDate;
-    }
-
-    const updatedIncome = await Income.findOneAndUpdate(
-      { _id: id, userId: req.user._id },
-      updateData,
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedIncome) {
-      throw new ApiErrors(404, "Income not found");
-    }
+    const updatedIncome = await IncomeService.updateIncome(req.user._id, id, {
+      icon,
+      source,
+      amount,
+      date: parsedDate,
+    });
 
     res.status(200).json(
       new ApiResponse(200, updatedIncome, "Income updated successfully")
@@ -207,18 +110,7 @@ const deleteIncome = asyncHandler(
 
     const { id } = req.params;
 
-    if (!id) {
-      throw new ApiErrors(400, "Income ID is required");
-    }
-
-    const deletedIncome = await Income.findOneAndDelete({
-      _id: id,
-      userId: req.user._id,
-    });
-
-    if (!deletedIncome) {
-      throw new ApiErrors(404, "Income not found");
-    }
+    await IncomeService.deleteIncome(req.user._id, id);
 
     res.status(200).json(
       new ApiResponse(200, null, "Income deleted successfully")
@@ -233,49 +125,7 @@ const downloadIncomeExcel = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const income = await Income.find({ userId: req.user._id })
-      .sort({ date: -1 })
-      .select("-__v -userId");
-
-    if (!income.length) {
-      throw new ApiErrors(404, "No income records found");
-    }
-
-    // Prepare data for Excel
-    const data = income.map((item) => ({
-      Source: item.source,
-      Amount: item.amount,
-      Date: item.date.toISOString().split("T")[0], // Format date as YYYY-MM-DD
-      Icon: item.icon || "",
-      "Created At": item.createdAt.toISOString().split("T")[0],
-    }));
-
-    // Create workbook and worksheet
-    const wb = xlsx.utils.book_new();
-    const ws = xlsx.utils.json_to_sheet(data);
-
-    // Add some styling and formatting
-    const range = xlsx.utils.decode_range(ws["!ref"] || "A1");
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const address = xlsx.utils.encode_col(C) + "1";
-      if (!ws[address]) continue;
-      ws[address].s = { font: { bold: true } };
-    }
-
-    xlsx.utils.book_append_sheet(wb, ws, "Income Records");
-
-    // Generate filename with timestamp
-    const filename = `income_details_${new Date().toISOString().split("T")[0]}.xlsx`;
-    const filepath = path.join(process.cwd(), "temp", filename);
-
-    // Ensure temp directory exists
-    const tempDir = path.join(process.cwd(), "temp");
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-
-    // Write file
-    xlsx.writeFile(wb, filepath);
+    const { filepath, filename } = await IncomeService.generateIncomeExcel(req.user._id);
 
     // Set proper headers for file download
     res.setHeader(
@@ -308,40 +158,12 @@ const getIncomeStats = asyncHandler(
 
     const { year, month } = req.query;
 
-    // Build date filter
-    const dateFilter: any = {};
-    if (year) {
-      const startDate = new Date(parseInt(year as string), 0, 1);
-      const endDate = new Date(parseInt(year as string) + 1, 0, 1);
-      dateFilter.date = { $gte: startDate, $lt: endDate };
-    }
-    if (month && year) {
-      const startDate = new Date(parseInt(year as string), parseInt(month as string) - 1, 1);
-      const endDate = new Date(parseInt(year as string), parseInt(month as string), 1);
-      dateFilter.date = { $gte: startDate, $lt: endDate };
-    }
-
-    const stats = await Income.aggregate([
-      { $match: { userId: req.user._id, ...dateFilter } },
-      {
-        $group: {
-          _id: null,
-          totalIncome: { $sum: "$amount" },
-          averageIncome: { $avg: "$amount" },
-          count: { $sum: 1 },
-          maxIncome: { $max: "$amount" },
-          minIncome: { $min: "$amount" },
-        },
-      },
-    ]);
-
-    const result = stats.length > 0 ? stats[0] : {
-      totalIncome: 0,
-      averageIncome: 0,
-      count: 0,
-      maxIncome: 0,
-      minIncome: 0,
+    const filter = {
+      year: year ? parseInt(year as string) : undefined,
+      month: month ? parseInt(month as string) : undefined,
     };
+
+    const result = await IncomeService.getIncomeStats(req.user._id, filter);
 
     res.status(200).json(
       new ApiResponse(200, result, "Income statistics retrieved successfully")

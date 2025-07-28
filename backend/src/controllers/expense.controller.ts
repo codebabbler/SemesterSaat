@@ -2,13 +2,9 @@ import { Response } from "express";
 import asyncHandler from "../utils/asyncHandler";
 import ApiErrors from "../utils/ApiErrors";
 import ApiResponse from "../utils/ApiResponse";
-import Expense from "../models/expense.models";
-import type { IExpense } from "../models/expense.models";
 import { AuthenticatedRequest } from "../types/common.types";
-import * as xlsx from "xlsx";
+import ExpenseService from "../services/expense.service";
 import * as fs from "fs";
-import * as path from "path";
-import AnomalyService from "../services/anomaly.service";
 
 // Add Expense
 const addExpense = asyncHandler(
@@ -19,57 +15,20 @@ const addExpense = asyncHandler(
 
     const { icon, category, amount, date } = req.body;
 
-    // Validation: Check for missing fields
-    if (
-      [category, amount, date].some(
-        (field) => field === undefined || field === null || field === ""
-      )
-    ) {
-      throw new ApiErrors(400, "Category, amount, and date are required");
-    }
-
-    // Validate amount is a positive number
-    if (typeof amount !== "number" || amount <= 0) {
-      throw new ApiErrors(400, "Amount must be a positive number");
-    }
-
-    // Validate date
+    // Parse date
     const parsedDate = new Date(date);
-    if (isNaN(parsedDate.getTime())) {
-      throw new ApiErrors(400, "Invalid date format");
-    }
 
-    const newExpense = await Expense.create({
+    const result = await ExpenseService.createExpense({
       userId: req.user._id,
-      icon: icon || "",
-      category: category.trim(),
+      icon,
+      category,
       amount,
       date: parsedDate,
     });
 
-    // Detect anomaly for this expense
-    try {
-      const anomalyResult = await AnomalyService.detectAnomaly(
-        req.user._id,
-        newExpense._id,
-        'expense',
-        category.trim(),
-        amount
-      );
-      
-      res.status(201).json(
-        new ApiResponse(201, {
-          expense: newExpense,
-          anomalyDetection: anomalyResult
-        }, "Expense added successfully")
-      );
-    } catch (anomalyError) {
-      console.error('Anomaly detection failed:', anomalyError);
-      // Still return success for expense creation even if anomaly detection fails
-      res.status(201).json(
-        new ApiResponse(201, newExpense, "Expense added successfully (anomaly detection unavailable)")
-      );
-    }
+    res.status(201).json(
+      new ApiResponse(201, result, "Expense added successfully")
+    );
   }
 );
 
@@ -82,39 +41,19 @@ const getAllExpenses = asyncHandler(
 
     const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc" } = req.query;
 
-    // Validate pagination parameters
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
+    const sortOrderTyped = sortOrder as 'asc' | 'desc';
 
-    if (pageNum < 1 || limitNum < 1) {
-      throw new ApiErrors(400, "Page and limit must be positive numbers");
-    }
-
-    const skip = (pageNum - 1) * limitNum;
-    const sortDirection = sortOrder === "asc" ? 1 : -1;
-
-    const expenses = await Expense.find({ userId: req.user._id })
-      .sort({ [sortBy as string]: sortDirection })
-      .skip(skip)
-      .limit(limitNum)
-      .select("-__v");
-
-    const totalCount = await Expense.countDocuments({ userId: req.user._id });
+    const result = await ExpenseService.getAllExpenses(req.user._id, {
+      page: pageNum,
+      limit: limitNum,
+      sortBy: sortBy as string,
+      sortOrder: sortOrderTyped,
+    });
 
     res.status(200).json(
-      new ApiResponse(
-        200,
-        {
-          expenses,
-          pagination: {
-            currentPage: pageNum,
-            totalPages: Math.ceil(totalCount / limitNum),
-            totalItems: totalCount,
-            itemsPerPage: limitNum,
-          },
-        },
-        "Expenses retrieved successfully"
-      )
+      new ApiResponse(200, result, "Expenses retrieved successfully")
     );
   }
 );
@@ -128,15 +67,7 @@ const getExpenseById = asyncHandler(
 
     const { id } = req.params;
 
-    if (!id) {
-      throw new ApiErrors(400, "Expense ID is required");
-    }
-
-    const expense = await Expense.findOne({ _id: id, userId: req.user._id });
-
-    if (!expense) {
-      throw new ApiErrors(404, "Expense not found");
-    }
+    const expense = await ExpenseService.getExpenseById(req.user._id, id);
 
     res.status(200).json(
       new ApiResponse(200, expense, "Expense retrieved successfully")
@@ -154,43 +85,15 @@ const updateExpense = asyncHandler(
     const { id } = req.params;
     const { icon, category, amount, date } = req.body;
 
-    if (!id) {
-      throw new ApiErrors(400, "Expense ID is required");
-    }
+    // Parse date if provided
+    const parsedDate = date ? new Date(date) : undefined;
 
-    // Build update object with only provided fields
-    const updateData: Partial<IExpense> = {};
-    
-    if (icon !== undefined) updateData.icon = icon;
-    if (category !== undefined) {
-      if (!category.trim()) {
-        throw new ApiErrors(400, "Category cannot be empty");
-      }
-      updateData.category = category.trim();
-    }
-    if (amount !== undefined) {
-      if (typeof amount !== "number" || amount <= 0) {
-        throw new ApiErrors(400, "Amount must be a positive number");
-      }
-      updateData.amount = amount;
-    }
-    if (date !== undefined) {
-      const parsedDate = new Date(date);
-      if (isNaN(parsedDate.getTime())) {
-        throw new ApiErrors(400, "Invalid date format");
-      }
-      updateData.date = parsedDate;
-    }
-
-    const updatedExpense = await Expense.findOneAndUpdate(
-      { _id: id, userId: req.user._id },
-      updateData,
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedExpense) {
-      throw new ApiErrors(404, "Expense not found");
-    }
+    const updatedExpense = await ExpenseService.updateExpense(req.user._id, id, {
+      icon,
+      category,
+      amount,
+      date: parsedDate,
+    });
 
     res.status(200).json(
       new ApiResponse(200, updatedExpense, "Expense updated successfully")
@@ -207,18 +110,7 @@ const deleteExpense = asyncHandler(
 
     const { id } = req.params;
 
-    if (!id) {
-      throw new ApiErrors(400, "Expense ID is required");
-    }
-
-    const deletedExpense = await Expense.findOneAndDelete({
-      _id: id,
-      userId: req.user._id,
-    });
-
-    if (!deletedExpense) {
-      throw new ApiErrors(404, "Expense not found");
-    }
+    await ExpenseService.deleteExpense(req.user._id, id);
 
     res.status(200).json(
       new ApiResponse(200, null, "Expense deleted successfully")
@@ -235,16 +127,7 @@ const getExpensesByCategory = asyncHandler(
 
     const { category } = req.params;
 
-    if (!category) {
-      throw new ApiErrors(400, "Category is required");
-    }
-
-    const expenses = await Expense.find({ 
-      userId: req.user._id, 
-      category: { $regex: new RegExp(category, "i") } 
-    })
-      .sort({ date: -1 })
-      .select("-__v");
+    const expenses = await ExpenseService.getExpensesByCategory(req.user._id, category);
 
     res.status(200).json(
       new ApiResponse(200, expenses, "Expenses by category retrieved successfully")
@@ -259,49 +142,7 @@ const downloadExpenseExcel = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const expenses = await Expense.find({ userId: req.user._id })
-      .sort({ date: -1 })
-      .select("-__v -userId");
-
-    if (!expenses.length) {
-      throw new ApiErrors(404, "No expense records found");
-    }
-
-    // Prepare data for Excel
-    const data = expenses.map((item) => ({
-      Category: item.category,
-      Amount: item.amount,
-      Date: item.date.toISOString().split("T")[0], // Format date as YYYY-MM-DD
-      Icon: item.icon || "",
-      "Created At": item.createdAt.toISOString().split("T")[0],
-    }));
-
-    // Create workbook and worksheet
-    const wb = xlsx.utils.book_new();
-    const ws = xlsx.utils.json_to_sheet(data);
-
-    // Add some styling and formatting
-    const range = xlsx.utils.decode_range(ws["!ref"] || "A1");
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const address = xlsx.utils.encode_col(C) + "1";
-      if (!ws[address]) continue;
-      ws[address].s = { font: { bold: true } };
-    }
-
-    xlsx.utils.book_append_sheet(wb, ws, "Expense Records");
-
-    // Generate filename with timestamp
-    const filename = `expense_details_${new Date().toISOString().split("T")[0]}.xlsx`;
-    const filepath = path.join(process.cwd(), "temp", filename);
-
-    // Ensure temp directory exists
-    const tempDir = path.join(process.cwd(), "temp");
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-
-    // Write file
-    xlsx.writeFile(wb, filepath);
+    const { filepath, filename } = await ExpenseService.generateExpenseExcel(req.user._id);
 
     // Set proper headers for file download
     res.setHeader(
@@ -334,61 +175,13 @@ const getExpenseStats = asyncHandler(
 
     const { year, month, category } = req.query;
 
-    // Build date filter
-    const matchFilter: any = { userId: req.user._id };
-    
-    if (year) {
-      const startDate = new Date(parseInt(year as string), 0, 1);
-      const endDate = new Date(parseInt(year as string) + 1, 0, 1);
-      matchFilter.date = { $gte: startDate, $lt: endDate };
-    }
-    if (month && year) {
-      const startDate = new Date(parseInt(year as string), parseInt(month as string) - 1, 1);
-      const endDate = new Date(parseInt(year as string), parseInt(month as string), 1);
-      matchFilter.date = { $gte: startDate, $lt: endDate };
-    }
-    if (category) {
-      matchFilter.category = { $regex: new RegExp(category as string, "i") };
-    }
-
-    const stats = await Expense.aggregate([
-      { $match: matchFilter },
-      {
-        $group: {
-          _id: null,
-          totalExpense: { $sum: "$amount" },
-          averageExpense: { $avg: "$amount" },
-          count: { $sum: 1 },
-          maxExpense: { $max: "$amount" },
-          minExpense: { $min: "$amount" },
-        },
-      },
-    ]);
-
-    // Get category breakdown
-    const categoryStats = await Expense.aggregate([
-      { $match: matchFilter },
-      {
-        $group: {
-          _id: "$category",
-          totalAmount: { $sum: "$amount" },
-          count: { $sum: 1 },
-          averageAmount: { $avg: "$amount" },
-        },
-      },
-      { $sort: { totalAmount: -1 } },
-    ]);
-
-    const result = {
-      overall: stats.length > 0 ? stats[0] : {
-        totalExpense: 0,
-        averageExpense: 0,
-        count: 0,
-        maxExpense: 0,
-        minExpense: 0,
-      },
-      byCategory: categoryStats,
+    const filter = {
+      year: year ? parseInt(year as string) : undefined,
+      month: month ? parseInt(month as string) : undefined,
+      category: category as string,
     };
+
+    const result = await ExpenseService.getExpenseStats(req.user._id, filter);
 
     res.status(200).json(
       new ApiResponse(200, result, "Expense statistics retrieved successfully")
@@ -405,35 +198,10 @@ const getMonthlyExpenseTrends = asyncHandler(
 
     const { year = new Date().getFullYear() } = req.query;
 
-    const trends = await Expense.aggregate([
-      {
-        $match: {
-          userId: req.user._id,
-          date: {
-            $gte: new Date(parseInt(year as string), 0, 1),
-            $lt: new Date(parseInt(year as string) + 1, 0, 1),
-          },
-        },
-      },
-      {
-        $group: {
-          _id: { $month: "$date" },
-          totalAmount: { $sum: "$amount" },
-          count: { $sum: 1 },
-          averageAmount: { $avg: "$amount" },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          month: "$_id",
-          totalAmount: 1,
-          count: 1,
-          averageAmount: 1,
-        },
-      },
-      { $sort: { month: 1 } },
-    ]);
+    const trends = await ExpenseService.getMonthlyExpenseTrends(
+      req.user._id, 
+      parseInt(year as string)
+    );
 
     res.status(200).json(
       new ApiResponse(200, trends, "Monthly expense trends retrieved successfully")
