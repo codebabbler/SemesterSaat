@@ -5,6 +5,7 @@ import ApiResponse from "../utils/ApiResponse";
 import Expense from "../models/expense.models";
 import type { IExpense } from "../models/expense.models";
 import { AuthenticatedRequest } from "../types/common.types";
+import { mlService, type PredictionResponse, type FeedbackResponse } from "../services/mlService";
 import * as xlsx from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
@@ -578,6 +579,125 @@ const getMonthlyExpenseTrends = asyncHandler(
   }
 );
 
+// Predict Expense Category using ML
+const predictExpenseCategory = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { description } = req.body;
+
+    // Validation
+    if (!description || typeof description !== "string" || description.trim().length === 0) {
+      throw new ApiErrors(400, "Description is required for category prediction");
+    }
+
+    try {
+      // Get prediction from ML service
+      const prediction: PredictionResponse = await mlService.predictCategory(description);
+      
+      // Map to standardized category
+      const standardCategory = mlService.mapToStandardCategory(prediction.category);
+
+      const result = {
+        originalCategory: prediction.category,
+        category: standardCategory,
+        confidence: prediction.confidence,
+        description: description.trim(),
+        isHighConfidence: prediction.confidence >= 0.4,
+        suggestFeedback: prediction.confidence < 0.4 || standardCategory === 'Unknown'
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, result, "Category prediction completed successfully")
+      );
+    } catch (error) {
+      console.error("Prediction error:", error);
+      
+      // Return fallback response
+      const fallbackResult = {
+        originalCategory: 'Unknown',
+        category: 'Unknown',
+        confidence: 0,
+        description: description.trim(),
+        isHighConfidence: false,
+        suggestFeedback: true,
+        mlServiceDown: true
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, fallbackResult, "ML service unavailable, returned fallback prediction")
+      );
+    }
+  }
+);
+
+// Send Feedback for Expense Category Prediction
+const sendExpenseCategoryFeedback = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { description, category } = req.body;
+
+    // Validation
+    if (!description || typeof description !== "string" || description.trim().length === 0) {
+      throw new ApiErrors(400, "Description is required for feedback");
+    }
+
+    if (!category || typeof category !== "string" || category.trim().length === 0) {
+      throw new ApiErrors(400, "Category is required for feedback");
+    }
+
+    // Validate category is one of the standard categories
+    const standardCategories = [
+      'Salary', 'Shopping', 'Education', 'Health', 'Utilities', 
+      'Entertainment', 'Transportation', 'Food', 'Unknown'
+    ];
+
+    if (!standardCategories.includes(category.trim())) {
+      throw new ApiErrors(400, `Category must be one of: ${standardCategories.join(', ')}`);
+    }
+
+    try {
+      // Send feedback to ML service
+      const feedbackResponse: FeedbackResponse = await mlService.sendFeedback(
+        description.trim(), 
+        category.trim()
+      );
+
+      const result = {
+        message: feedbackResponse.message,
+        description: description.trim(),
+        category: category.trim(),
+        feedbackCount: feedbackResponse.feedback_count,
+        totalClasses: feedbackResponse.total_classes,
+        availableClasses: feedbackResponse.classes
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, result, "Feedback sent successfully")
+      );
+    } catch (error) {
+      console.error("Feedback error:", error);
+      
+      // Still return success even if ML service is down
+      const fallbackResult = {
+        message: "Feedback received but ML service unavailable",
+        description: description.trim(),
+        category: category.trim(),
+        mlServiceDown: true
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, fallbackResult, "Feedback received (ML service unavailable)")
+      );
+    }
+  }
+);
+
 export {
   addExpense,
   getAllExpenses,
@@ -588,4 +708,6 @@ export {
   downloadExpenseExcel,
   getExpenseStats,
   getMonthlyExpenseTrends,
+  predictExpenseCategory,
+  sendExpenseCategoryFeedback,
 };

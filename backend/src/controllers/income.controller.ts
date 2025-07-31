@@ -5,6 +5,7 @@ import ApiResponse from "../utils/ApiResponse";
 import Income from "../models/income.models";
 import type { IIncome } from "../models/income.models";
 import { AuthenticatedRequest } from "../types/common.types";
+import { mlService, type PredictionResponse, type FeedbackResponse } from "../services/mlService";
 import * as xlsx from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
@@ -486,6 +487,142 @@ const getIncomeStats = asyncHandler(
   }
 );
 
+// Predict Income Source using ML
+const predictIncomeSource = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { description } = req.body;
+
+    // Validation
+    if (!description || typeof description !== "string" || description.trim().length === 0) {
+      throw new ApiErrors(400, "Description is required for source prediction");
+    }
+
+    try {
+      // Get prediction from ML service
+      const prediction: PredictionResponse = await mlService.predictCategory(description);
+      
+      // Map to income-relevant categories (treat as source)
+      let sourceCategory = prediction.category;
+      
+      // Map some expense categories to income sources
+      const incomeSourceMappings: Record<string, string> = {
+        'Food': 'Salary',
+        'Shopping': 'Salary', 
+        'Transportation': 'Salary',
+        'Health': 'Salary',
+        'Education': 'Salary',
+        'Utilities': 'Salary',
+        'Entertainment': 'Salary',
+        'Salary': 'Salary',
+        'Unknown': 'Unknown'
+      };
+
+      sourceCategory = incomeSourceMappings[prediction.category] || 'Salary';
+
+      const result = {
+        originalSource: prediction.category,
+        source: sourceCategory,
+        confidence: prediction.confidence,
+        description: description.trim(),
+        isHighConfidence: prediction.confidence >= 0.4,
+        suggestFeedback: prediction.confidence < 0.4 || sourceCategory === 'Unknown'
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, result, "Income source prediction completed successfully")
+      );
+    } catch (error) {
+      console.error("Income prediction error:", error);
+      
+      // Return fallback response
+      const fallbackResult = {
+        originalSource: 'Unknown',
+        source: 'Salary',
+        confidence: 0,
+        description: description.trim(),
+        isHighConfidence: false,
+        suggestFeedback: true,
+        mlServiceDown: true
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, fallbackResult, "ML service unavailable, returned fallback prediction")
+      );
+    }
+  }
+);
+
+// Send Feedback for Income Source Prediction
+const sendIncomeSourceFeedback = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { description, source } = req.body;
+
+    // Validation
+    if (!description || typeof description !== "string" || description.trim().length === 0) {
+      throw new ApiErrors(400, "Description is required for feedback");
+    }
+
+    if (!source || typeof source !== "string" || source.trim().length === 0) {
+      throw new ApiErrors(400, "Source is required for feedback");
+    }
+
+    // Validate source is reasonable for income
+    const commonIncomeSources = [
+      'Salary', 'Freelance', 'Business', 'Investment', 'Rental', 
+      'Part-time', 'Commission', 'Bonus', 'Unknown'
+    ];
+
+    const providedSource = source.trim();
+    // Allow any source, but log if it's not in common list
+    if (!commonIncomeSources.includes(providedSource)) {
+      console.log(`New income source provided: ${providedSource}`);
+    }
+
+    try {
+      // Send feedback to ML service (treat income source as category for ML training)
+      const feedbackResponse: FeedbackResponse = await mlService.sendFeedback(
+        description.trim(), 
+        providedSource
+      );
+
+      const result = {
+        message: feedbackResponse.message,
+        description: description.trim(),
+        source: providedSource,
+        feedbackCount: feedbackResponse.feedback_count,
+        totalClasses: feedbackResponse.total_classes,
+        availableClasses: feedbackResponse.classes
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, result, "Income source feedback sent successfully")
+      );
+    } catch (error) {
+      console.error("Income feedback error:", error);
+      
+      // Still return success even if ML service is down
+      const fallbackResult = {
+        message: "Feedback received but ML service unavailable",
+        description: description.trim(),
+        source: providedSource,
+        mlServiceDown: true
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, fallbackResult, "Feedback received (ML service unavailable)")
+      );
+    }
+  }
+);
+
 export {
   addIncome,
   getAllIncome,
@@ -494,4 +631,6 @@ export {
   deleteIncome,
   downloadIncomeExcel,
   getIncomeStats,
+  predictIncomeSource,
+  sendIncomeSourceFeedback,
 };

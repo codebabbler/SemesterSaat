@@ -7,6 +7,8 @@ import {
   deleteIncome,
   downloadIncomeExcel,
   getIncomeStats,
+  predictIncomeSource,
+  sendIncomeSourceFeedback,
 } from "../controllers/income.controller";
 import { verifyJWT } from "../middleware/auth.middleware";
 
@@ -21,6 +23,13 @@ router.route("/stats")
 
 router.route("/download/excel")
   .get(downloadIncomeExcel); // GET /api/v1/income/download/excel - Download Excel report
+
+// ML prediction endpoints
+router.route("/predict-source")
+  .post(predictIncomeSource); // POST /api/v1/income/predict-source - Predict income source
+
+router.route("/feedback-source")
+  .post(sendIncomeSourceFeedback); // POST /api/v1/income/feedback-source - Send source feedback
 
 // CRUD operations
 router.route("/")

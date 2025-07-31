@@ -23,6 +23,8 @@ export const API_PATHS = {
     DELETE_INCOME: (incomeId: string) => `/api/v1/income/${incomeId}`,
     DOWNLOAD_INCOME: `/api/v1/income/download/excel`,
     STATS: "/api/v1/income/stats",
+    PREDICT_SOURCE: "/api/v1/income/predict-source",
+    FEEDBACK_SOURCE: "/api/v1/income/feedback-source",
   },
   EXPENSE: {
     ADD_EXPENSE: "/api/v1/expense",
@@ -34,6 +36,8 @@ export const API_PATHS = {
     STATS: "/api/v1/expense/stats",
     MONTHLY_TRENDS: "/api/v1/expense/trends/monthly",
     BY_CATEGORY: (category: string) => `/api/v1/expense/category/${category}`,
+    PREDICT_CATEGORY: "/api/v1/expense/predict-category",
+    FEEDBACK_CATEGORY: "/api/v1/expense/feedback-category",
   },
   IMAGE: {
     UPLOAD_IMAGE: "/api/v1/upload/image",
