@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import Input from "~/components/Inputs/Input";
 import DatePicker from "~/components/Inputs/DatePicker";
-import EmojiPickerPopup from "~/components/EmojiPickerPopup";
 
 interface IncomeData {
   source: string;
@@ -28,16 +27,11 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
     recurringPeriod: "",
   });
 
-  const handleChange = (key: keyof IncomeData, value: string | boolean) => 
+  const handleChange = (key: keyof IncomeData, value: string | boolean) =>
     setIncome({ ...income, [key]: value });
 
   return (
     <div>
-      <EmojiPickerPopup
-        icon={income.icon}
-        onSelect={(selectedIcon) => handleChange("icon", selectedIcon)}
-      />
-
       <Input
         value={income.source}
         onChange={({ target }) => handleChange("source", target.value)}
@@ -69,19 +63,21 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
             onChange={(e) => handleChange("isRecurring", e.target.checked)}
             className="form-checkbox h-4 w-4 text-blue-600"
           />
-          <span className="text-sm font-medium text-gray-700">Recurring Income</span>
+          <span className="text-sm font-medium text-gray-700">
+            Recurring Income
+          </span>
         </label>
       </div>
 
       {income.isRecurring && (
         <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="mb-2 block text-sm font-medium text-gray-700">
             Recurring Period
           </label>
           <select
             value={income.recurringPeriod}
             onChange={(e) => handleChange("recurringPeriod", e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
           >
             <option value="">Select period</option>
             <option value="daily">Daily</option>
@@ -92,7 +88,7 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
         </div>
       )}
 
-      <div className="flex justify-end mt-6">
+      <div className="mt-6 flex justify-end">
         <button
           type="button"
           className="add-btn add-btn-fill"
