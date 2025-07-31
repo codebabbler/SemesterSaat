@@ -14,18 +14,60 @@ app_nb = FastAPI(title="Naive Bayes Text Classification API")
 app_rl = FastAPI(title="Reinforcement Learning Q-Learning API")
 
 MODEL_PATH = "nb_model.pkl"
+FEEDBACK_PATH = "feedback_data.csv"
+RETRAIN_THRESHOLD = 1
 
 def train_nb_model():
-    fname = 'nepal_synthetic_expenses.csv'
-    if not os.path.exists(fname):
-        raise FileNotFoundError(f"{fname} not found. Please ensure the dataset is available.")
-    df = pd.read_csv(fname, parse_dates=['Date'], dayfirst=True, sep=',', on_bad_lines='skip')
-    df = df.dropna(subset=['Note', 'Category'])
+    fname = 'nepal_expenses.csv'
+    df = None
+    
+    # Try to load original dataset
+    if os.path.exists(fname):
+        try:
+            df = pd.read_csv(fname, parse_dates=['Date'], dayfirst=True, sep=',', on_bad_lines='skip')
+            df = df.dropna(subset=['Note', 'Category'])
+            print(f"Loaded {len(df)} samples from original dataset")
+        except Exception as e:
+            print(f"Warning: Could not load original dataset: {e}")
+            df = None
+    
+    # Load feedback data
+    feedback_df = None
+    if os.path.exists(FEEDBACK_PATH):
+        try:
+            feedback_df = pd.read_csv(FEEDBACK_PATH)
+            feedback_df = feedback_df.dropna(subset=['text', 'category'])
+            feedback_df = feedback_df.rename(columns={'text': 'Note', 'category': 'Category'})
+            print(f"Loaded {len(feedback_df)} samples from feedback data")
+        except Exception as e:
+            print(f"Warning: Could not load feedback data: {e}")
+            feedback_df = None
+    
+    # Combine datasets
+    if df is not None and feedback_df is not None:
+        df = pd.concat([df, feedback_df], ignore_index=True)
+    elif feedback_df is not None:
+        df = feedback_df
+        print("Training with feedback data only")
+    elif df is not None:
+        print("Training with original data only")
+    else:
+        raise ValueError("No training data available. Need either original dataset or feedback data.")
+    
+    # Validate minimum data requirements
+    if len(df) < 4:
+        raise ValueError(f"Insufficient training data: {len(df)} samples. Need at least 4 samples.")
+    
     counts = df['Category'].value_counts()
-    valid = counts[counts >= 3].index
+    valid = counts[counts >= 2].index
     df = df[df['Category'].isin(valid)]
+    
+    if len(df) < 4:
+        raise ValueError(f"Insufficient valid categories after filtering: {len(df)} samples remaining.")
+    
     X = df['Note']
     y = df['Category']
+    print(f"Training with {len(X)} samples across {len(y.unique())} categories")
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
@@ -54,6 +96,12 @@ else:
 class TextInput(BaseModel):
     text: str
 
+# Feedback input model for NB API
+class FeedbackInput(BaseModel):
+    text: str
+    category: str
+
+
 @app_nb.post("/predict")
 async def predict_category(input: TextInput):
     try:
@@ -61,9 +109,57 @@ async def predict_category(input: TextInput):
         predicted_category_index = prediction_proba.argmax()
         predicted_category = nb_model.classes_[predicted_category_index]
         confidence = prediction_proba[0][predicted_category_index]
+        print(f"Predicted category: {predicted_category}, Confidence: {confidence}")
+        if confidence < 0.4:
+            return {"category": "Unknown", "confidence": float(confidence)}
         return {"category": predicted_category, "confidence": float(confidence)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+
+def save_feedback(text: str, category: str):
+    """Store feedback data to CSV file for incremental learning"""
+    feedback_data = pd.DataFrame([[text, category]], columns=['text', 'category'])
+    if os.path.exists(FEEDBACK_PATH):
+        feedback_data.to_csv(FEEDBACK_PATH, mode='a', header=False, index=False)
+    else:
+        feedback_data.to_csv(FEEDBACK_PATH, index=False)
+
+def get_feedback_count():
+    """Get current number of feedback entries"""
+    if os.path.exists(FEEDBACK_PATH):
+        return len(pd.read_csv(FEEDBACK_PATH))
+    return 0
+
+def should_retrain():
+    """Check if model should be retrained based on feedback count"""
+    return get_feedback_count() >= RETRAIN_THRESHOLD
+
+@app_nb.post("/feedback")
+async def feedback(input: FeedbackInput):
+    """
+    Store feedback and retrain model when threshold is reached
+    """
+    global nb_model
+    try:
+        save_feedback(input.text, input.category)
+        
+        if should_retrain():
+            try:
+                print(f"Retraining model with {get_feedback_count()} feedback samples...")
+                nb_model = train_nb_model()
+                print("Model retrained successfully!")
+                return {"message": f"Model retrained with feedback data. Total feedback: {get_feedback_count()}", "category": input.category}
+            except ValueError as ve:
+                return {"message": f"Cannot retrain yet: {str(ve)}", "category": input.category, "feedback_count": get_feedback_count()}
+            except Exception as te:
+                print(f"Training error: {te}")
+                return {"message": f"Training failed: {str(te)}", "category": input.category, "feedback_count": get_feedback_count()}
+        else:
+            remaining = RETRAIN_THRESHOLD - get_feedback_count()
+            return {"message": f"Feedback saved. {remaining} more needed for retraining.", "category": input.category, "feedback_count": get_feedback_count()}
+    except Exception as e:
+        print(f"Feedback processing error: {e}")
+        raise HTTPException(status_code=500, detail=f"Feedback error: {str(e)}")
 
 class GridWorld:
     def __init__(self, size=4, goal_state=15):
@@ -83,7 +179,6 @@ class GridWorld:
         else:
             next_state = state
 
-        # Penalize invalid or no-op moves heavily, small step penalty otherwise, reward on goal
         if next_state == state:
             reward = -0.1
         else:
@@ -139,14 +234,11 @@ async def take_step(input: RLActionInput):
             raise HTTPException(status_code=400, detail="Invalid action. Choose from 'up', 'right', 'down', 'left'.")
         action_idx = agent.actions.index(input.action)
 
-        # Use environment to compute next state and reward
         next_state, reward, done = grid_env.step(current_state, input.action)
 
-        # Update Q-table and agent state
         agent.update(current_state, action_idx, reward, next_state)
         agent.set_state(next_state)
 
-        # Decay exploration rate
         agent.epsilon = max(agent.epsilon * 0.995, 0.01)
 
         return {
