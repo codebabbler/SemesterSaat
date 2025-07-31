@@ -96,7 +96,6 @@ else:
 class TextInput(BaseModel):
     text: str
 
-# Feedback input model for NB API
 class FeedbackInput(BaseModel):
     text: str
     category: str
