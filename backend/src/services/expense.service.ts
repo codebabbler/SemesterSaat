@@ -41,7 +41,7 @@ interface PaginationOptions {
 }
 
 interface PaginatedExpenseResult {
-  expenses: IExpense[];
+  expenses: (IExpense | VirtualExpenseTransaction)[];
   pagination: {
     currentPage: number;
     totalPages: number;
@@ -225,7 +225,7 @@ class ExpenseService {
       .sort({ [sortBy]: sortDirection })
       .select("-__v");
 
-    let allExpenses = [...expenses];
+    let allExpenses: (IExpense | VirtualExpenseTransaction)[] = [...expenses];
     
     // Generate recurring expenses if in predictive mode
     if (predictive) {

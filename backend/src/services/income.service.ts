@@ -41,7 +41,7 @@ interface PaginationOptions {
 }
 
 interface PaginatedIncomeResult {
-  income: IIncome[];
+  income: (IIncome | VirtualIncomeTransaction)[];
   pagination: {
     currentPage: number;
     totalPages: number;
@@ -216,7 +216,7 @@ class IncomeService {
       .sort({ [sortBy]: sortDirection })
       .select("-__v");
 
-    let allIncome = [...income];
+    let allIncome: (IIncome | VirtualIncomeTransaction)[] = [...income];
     
     // Generate recurring income if in predictive mode
     if (predictive) {
