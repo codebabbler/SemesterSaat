@@ -17,6 +17,7 @@ interface IAnomalyDetection extends Document {
   _id: string;
   userId: string;
   transactionId: string;
+  transactionModel: 'Expense' | 'Income';
   transactionType: 'expense' | 'income';
   category: string;
   amount: number;
@@ -76,6 +77,7 @@ const anomalyDetectionSchema = new Schema(
     },
     transactionId: {
       type: Schema.Types.ObjectId,
+      refPath: 'transactionModel',
       required: true,
     },
     transactionType: {
@@ -122,6 +124,11 @@ const anomalyDetectionSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// Virtual field to get the model name from transaction type
+anomalyDetectionSchema.virtual('transactionModel').get(function() {
+  return this.transactionType === 'expense' ? 'Expense' : 'Income';
+});
 
 // Create indexes for better query performance
 anomalyStatsSchema.index({ userId: 1, category: 1, transactionType: 1 }, { unique: true });
