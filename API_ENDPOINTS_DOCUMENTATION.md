@@ -89,9 +89,49 @@ This document provides a comprehensive overview of all API endpoints provided by
 
 ---
 
+## 🚨 Anomaly Detection Endpoints (`/api/v1/anomaly`)
+
+### Available Backend Endpoints
+
+| Method | Endpoint | Description | Frontend Usage |
+|--------|----------|-------------|----------------|
+| `GET` | `/transactions` | Get anomalous transactions (requires auth) | ❌ **Not Used** |
+| `GET` | `/stats` | Get anomaly detection statistics (requires auth) | ❌ **Not Used** |
+| `POST` | `/reset/category` | Reset anomaly stats for specific category (requires auth) | ❌ **Not Used** |
+| `POST` | `/reset/all` | Reset all anomaly stats for transaction type (requires auth) | ❌ **Not Used** |
+
+**Query Parameters for `/transactions`:**
+- `transactionType` (optional): Filter by 'expense' or 'income'
+- `page` (optional): Page number for pagination (default: 1)
+- `limit` (optional): Items per page (default: 10, max: 100)
+
+**Query Parameters for `/stats`:**
+- `transactionType` (optional): Filter by 'expense' or 'income'
+
+**Request Body for `/reset/category`:**
+```json
+{
+  "category": "string",
+  "transactionType": "expense" | "income"
+}
+```
+
+**Request Body for `/reset/all`:**
+```json
+{
+  "transactionType": "expense" | "income"
+}
+```
+
+**Enhanced Transaction Creation:**
+- Both expense and income creation now automatically include anomaly detection
+- Response includes `anomalyDetection` object with detection results
+
+---
+
 ## 📋 Summary
 
-### ✅ Implemented Features (13/18 endpoints)
+### ✅ Implemented Features (17/22 endpoints)
 - User registration and login
 - User logout and token refresh
 - User profile fetching
@@ -99,8 +139,10 @@ This document provides a comprehensive overview of all API endpoints provided by
 - Basic expense CRUD (Create, Read, Delete)
 - Basic income CRUD (Create, Read, Delete)
 - Excel export for both expenses and income
+- Anomaly detection for all transactions (automatic)
+- Anomaly analysis and reporting endpoints
 
-### ❌ Missing Frontend Implementation (5/18 endpoints)
+### ❌ Missing Frontend Implementation (9/22 endpoints)
 
 #### High Priority
 1. **User Profile Management**
@@ -121,8 +163,14 @@ This document provides a comprehensive overview of all API endpoints provided by
    - `GET /api/v1/income/stats` - Income statistics
    - `GET /api/v1/expense/trends/monthly` - Monthly expense trends
 
+4. **Anomaly Detection UI (4 endpoints)**
+   - `GET /api/v1/anomaly/transactions` - View anomalous transactions
+   - `GET /api/v1/anomaly/stats` - Anomaly detection statistics
+   - `POST /api/v1/anomaly/reset/category` - Reset category stats
+   - `POST /api/v1/anomaly/reset/all` - Reset all stats
+
 #### Lower Priority
-4. **Advanced Filtering**
+5. **Advanced Filtering**
    - `GET /api/v1/expense/category/:category` - Filter expenses by category
 
 ---

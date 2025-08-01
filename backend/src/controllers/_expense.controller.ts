@@ -13,7 +13,7 @@ const addExpense = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { icon, category, amount, date, isRecurring, recurringPeriod } = req.body;
+    const { icon, category, amount, date } = req.body;
 
     // Parse date
     const parsedDate = new Date(date);
@@ -24,8 +24,6 @@ const addExpense = asyncHandler(
       category,
       amount,
       date: parsedDate,
-      isRecurring,
-      recurringPeriod,
     });
 
     res.status(201).json(
@@ -34,7 +32,6 @@ const addExpense = asyncHandler(
   }
 );
 
-
 // Get All Expenses (For Logged-in User)
 const getAllExpenses = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -42,7 +39,7 @@ const getAllExpenses = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc", predictive = "false" } = req.query;
+    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc" } = req.query;
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
@@ -53,7 +50,6 @@ const getAllExpenses = asyncHandler(
       limit: limitNum,
       sortBy: sortBy as string,
       sortOrder: sortOrderTyped,
-      predictive: predictive === "true",
     });
 
     res.status(200).json(
@@ -87,7 +83,7 @@ const updateExpense = asyncHandler(
     }
 
     const { id } = req.params;
-    const { icon, category, amount, date, isRecurring, recurringPeriod } = req.body;
+    const { icon, category, amount, date } = req.body;
 
     // Parse date if provided
     const parsedDate = date ? new Date(date) : undefined;
@@ -97,8 +93,6 @@ const updateExpense = asyncHandler(
       category,
       amount,
       date: parsedDate,
-      isRecurring,
-      recurringPeriod,
     });
 
     res.status(200).json(
@@ -215,40 +209,6 @@ const getMonthlyExpenseTrends = asyncHandler(
   }
 );
 
-// Predict Expense Category using ML
-const predictExpenseCategory = asyncHandler(
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new ApiErrors(401, "User not authenticated");
-    }
-
-    const { description } = req.body;
-
-    const result = await ExpenseService.predictExpenseCategory(description);
-
-    res.status(200).json(
-      new ApiResponse(200, result, "Category prediction completed successfully")
-    );
-  }
-);
-
-// Send Feedback for Expense Category Prediction
-const sendExpenseCategoryFeedback = asyncHandler(
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new ApiErrors(401, "User not authenticated");
-    }
-
-    const { description, category } = req.body;
-
-    const result = await ExpenseService.sendExpenseCategoryFeedback(description, category);
-
-    res.status(200).json(
-      new ApiResponse(200, result, "Feedback sent successfully")
-    );
-  }
-);
-
 export {
   addExpense,
   getAllExpenses,
@@ -259,6 +219,4 @@ export {
   downloadExpenseExcel,
   getExpenseStats,
   getMonthlyExpenseTrends,
-  predictExpenseCategory,
-  sendExpenseCategoryFeedback,
 };

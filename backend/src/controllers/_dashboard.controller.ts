@@ -5,7 +5,6 @@ import ApiResponse from "../utils/ApiResponse";
 import { AuthenticatedRequest } from "../types/common.types";
 import DashboardService from "../services/dashboard.service";
 
-
 // Get Dashboard Data
 const getDashboardData = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -13,19 +12,14 @@ const getDashboardData = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { period = 30, limit = 5, predictive = "false" } = req.query;
+    const { period = 30, limit = 5 } = req.query;
 
     const periodDays = parseInt(period as string);
     const limitNum = parseInt(limit as string);
 
-    if (limitNum < 1 || limitNum > 50) {
-      throw new ApiErrors(400, "Limit must be between 1 and 50");
-    }
-
     const dashboardData = await DashboardService.getDashboardData(req.user._id, {
       period: periodDays,
       limit: limitNum,
-      predictive: predictive === "true",
     });
 
     res.status(200).json(

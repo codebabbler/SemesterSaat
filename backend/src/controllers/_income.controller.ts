@@ -13,7 +13,7 @@ const addIncome = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { icon, source, amount, date, isRecurring, recurringPeriod } = req.body;
+    const { icon, source, amount, date } = req.body;
 
     // Parse date
     const parsedDate = new Date(date);
@@ -24,8 +24,6 @@ const addIncome = asyncHandler(
       source,
       amount,
       date: parsedDate,
-      isRecurring,
-      recurringPeriod,
     });
 
     res.status(201).json(
@@ -34,7 +32,6 @@ const addIncome = asyncHandler(
   }
 );
 
-
 // Get All Income (For Logged-in User)
 const getAllIncome = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -42,7 +39,7 @@ const getAllIncome = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc", predictive = "false" } = req.query;
+    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc" } = req.query;
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
@@ -53,7 +50,6 @@ const getAllIncome = asyncHandler(
       limit: limitNum,
       sortBy: sortBy as string,
       sortOrder: sortOrderTyped,
-      predictive: predictive === "true",
     });
 
     res.status(200).json(
@@ -87,7 +83,7 @@ const updateIncome = asyncHandler(
     }
 
     const { id } = req.params;
-    const { icon, source, amount, date, isRecurring, recurringPeriod } = req.body;
+    const { icon, source, amount, date } = req.body;
 
     // Parse date if provided
     const parsedDate = date ? new Date(date) : undefined;
@@ -97,8 +93,6 @@ const updateIncome = asyncHandler(
       source,
       amount,
       date: parsedDate,
-      isRecurring,
-      recurringPeriod,
     });
 
     res.status(200).json(
@@ -177,40 +171,6 @@ const getIncomeStats = asyncHandler(
   }
 );
 
-// Predict Income Source using ML
-const predictIncomeSource = asyncHandler(
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new ApiErrors(401, "User not authenticated");
-    }
-
-    const { description } = req.body;
-
-    const result = await IncomeService.predictIncomeSource(description);
-
-    res.status(200).json(
-      new ApiResponse(200, result, "Income source prediction completed successfully")
-    );
-  }
-);
-
-// Send Feedback for Income Source Prediction
-const sendIncomeSourceFeedback = asyncHandler(
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new ApiErrors(401, "User not authenticated");
-    }
-
-    const { description, source } = req.body;
-
-    const result = await IncomeService.sendIncomeSourceFeedback(description, source);
-
-    res.status(200).json(
-      new ApiResponse(200, result, "Income source feedback sent successfully")
-    );
-  }
-);
-
 export {
   addIncome,
   getAllIncome,
@@ -219,6 +179,4 @@ export {
   deleteIncome,
   downloadIncomeExcel,
   getIncomeStats,
-  predictIncomeSource,
-  sendIncomeSourceFeedback,
 };
