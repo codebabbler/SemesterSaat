@@ -5,6 +5,7 @@ import ApiResponse from "../utils/ApiResponse";
 import Expense from "../models/expense.models";
 import type { IExpense } from "../models/expense.models";
 import { AuthenticatedRequest } from "../types/common.types";
+import { mlService, type PredictionResponse, type FeedbackResponse } from "../services/mlService";
 import * as xlsx from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
@@ -16,7 +17,7 @@ const addExpense = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { icon, category, amount, date } = req.body;
+    const { icon, category, amount, date, isRecurring, recurringPeriod } = req.body;
 
     // Validation: Check for missing fields
     if (
@@ -38,12 +39,44 @@ const addExpense = asyncHandler(
       throw new ApiErrors(400, "Invalid date format");
     }
 
+    // Validate recurring fields
+    if (isRecurring && !recurringPeriod) {
+      throw new ApiErrors(400, "Recurring period is required for recurring expenses");
+    }
+
+    if (isRecurring && !["daily", "weekly", "monthly", "yearly"].includes(recurringPeriod)) {
+      throw new ApiErrors(400, "Invalid recurring period");
+    }
+
+    // Calculate next recurring date
+    let nextRecurringDate: Date | undefined;
+    if (isRecurring && recurringPeriod) {
+      const baseDate = new Date(parsedDate);
+      switch (recurringPeriod) {
+        case "daily":
+          nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 1));
+          break;
+        case "weekly":
+          nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 7));
+          break;
+        case "monthly":
+          nextRecurringDate = new Date(baseDate.setMonth(baseDate.getMonth() + 1));
+          break;
+        case "yearly":
+          nextRecurringDate = new Date(baseDate.setFullYear(baseDate.getFullYear() + 1));
+          break;
+      }
+    }
+
     const newExpense = await Expense.create({
       userId: req.user._id,
       icon: icon || "",
       category: category.trim(),
       amount,
       date: parsedDate,
+      isRecurring: isRecurring || false,
+      recurringPeriod: isRecurring ? recurringPeriod : undefined,
+      nextRecurringDate,
     });
 
     res.status(201).json(
@@ -52,6 +85,68 @@ const addExpense = asyncHandler(
   }
 );
 
+// Helper function to generate recurring expenses
+const generateRecurringExpenses = (baseExpense: any, endDate: Date) => {
+  const recurringExpenses = [];
+  const { date, recurringPeriod, isRecurring } = baseExpense;
+  
+  if (!isRecurring || !recurringPeriod) {
+    return [];
+  }
+  
+  let currentDate = new Date(date);
+  const today = new Date();
+  
+  // If the base date is in the past, start from the next occurrence after today
+  if (currentDate < today) {
+    while (currentDate < today) {
+      switch (recurringPeriod) {
+        case "daily":
+          currentDate.setDate(currentDate.getDate() + 1);
+          break;
+        case "weekly":
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+        case "monthly":
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+        case "yearly":
+          currentDate.setFullYear(currentDate.getFullYear() + 1);
+          break;
+      }
+    }
+  }
+  
+  // Generate recurring entries up to endDate
+  while (currentDate <= endDate) {
+    recurringExpenses.push({
+      ...baseExpense.toObject(),
+      _id: `${baseExpense._id}_${currentDate.getTime()}`,
+      date: new Date(currentDate),
+      isVirtual: true,
+      originalId: baseExpense._id
+    });
+    
+    // Move to next occurrence
+    switch (recurringPeriod) {
+      case "daily":
+        currentDate.setDate(currentDate.getDate() + 1);
+        break;
+      case "weekly":
+        currentDate.setDate(currentDate.getDate() + 7);
+        break;
+      case "monthly":
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        break;
+      case "yearly":
+        currentDate.setFullYear(currentDate.getFullYear() + 1);
+        break;
+    }
+  }
+  
+  return recurringExpenses;
+};
+
 // Get All Expenses (For Logged-in User)
 const getAllExpenses = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -59,7 +154,7 @@ const getAllExpenses = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc" } = req.query;
+    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc", predictive = "false" } = req.query;
 
     // Validate pagination parameters
     const pageNum = parseInt(page as string);
@@ -72,19 +167,52 @@ const getAllExpenses = asyncHandler(
     const skip = (pageNum - 1) * limitNum;
     const sortDirection = sortOrder === "asc" ? 1 : -1;
 
-    const expenses = await Expense.find({ userId: req.user._id })
+    // Build query filter
+    const filter: any = { userId: req.user._id };
+    
+    // If not in predictive mode, filter out future dates
+    if (predictive !== "true") {
+      filter.date = { $lte: new Date() };
+    }
+
+    const expenses = await Expense.find(filter)
       .sort({ [sortBy as string]: sortDirection })
-      .skip(skip)
-      .limit(limitNum)
       .select("-__v");
 
-    const totalCount = await Expense.countDocuments({ userId: req.user._id });
+    let allExpenses = [...expenses];
+    
+    // Generate recurring expenses if in predictive mode
+    if (predictive === "true") {
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 3); // Show 3 months ahead
+      
+      const recurringExpenses = await Expense.find({
+        userId: req.user._id,
+        isRecurring: true
+      });
+      
+      recurringExpenses.forEach(expense => {
+        const generated = generateRecurringExpenses(expense, endDate);
+        allExpenses.push(...generated);
+      });
+    }
+    
+    // Sort all expenses
+    allExpenses.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return sortDirection === 1 ? dateA - dateB : dateB - dateA;
+    });
+    
+    // Apply pagination
+    const paginatedExpenses = allExpenses.slice(skip, skip + limitNum);
+    const totalCount = allExpenses.length;
 
     res.status(200).json(
       new ApiResponse(
         200,
         {
-          expenses,
+          expenses: paginatedExpenses,
           pagination: {
             currentPage: pageNum,
             totalPages: Math.ceil(totalCount / limitNum),
@@ -131,7 +259,7 @@ const updateExpense = asyncHandler(
     }
 
     const { id } = req.params;
-    const { icon, category, amount, date } = req.body;
+    const { icon, category, amount, date, isRecurring, recurringPeriod } = req.body;
 
     if (!id) {
       throw new ApiErrors(400, "Expense ID is required");
@@ -159,6 +287,37 @@ const updateExpense = asyncHandler(
         throw new ApiErrors(400, "Invalid date format");
       }
       updateData.date = parsedDate;
+    }
+    if (isRecurring !== undefined) {
+      updateData.isRecurring = isRecurring;
+      if (isRecurring && !recurringPeriod) {
+        throw new ApiErrors(400, "Recurring period is required for recurring expenses");
+      }
+    }
+    if (recurringPeriod !== undefined) {
+      if (!["daily", "weekly", "monthly", "yearly"].includes(recurringPeriod)) {
+        throw new ApiErrors(400, "Invalid recurring period");
+      }
+      updateData.recurringPeriod = recurringPeriod;
+      
+      // Recalculate next recurring date if recurring
+      if (updateData.isRecurring || (updateData.isRecurring === undefined && isRecurring)) {
+        const baseDate = new Date(updateData.date || date);
+        switch (recurringPeriod) {
+          case "daily":
+            updateData.nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 1));
+            break;
+          case "weekly":
+            updateData.nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 7));
+            break;
+          case "monthly":
+            updateData.nextRecurringDate = new Date(baseDate.setMonth(baseDate.getMonth() + 1));
+            break;
+          case "yearly":
+            updateData.nextRecurringDate = new Date(baseDate.setFullYear(baseDate.getFullYear() + 1));
+            break;
+        }
+      }
     }
 
     const updatedExpense = await Expense.findOneAndUpdate(
@@ -420,6 +579,125 @@ const getMonthlyExpenseTrends = asyncHandler(
   }
 );
 
+// Predict Expense Category using ML
+const predictExpenseCategory = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { description } = req.body;
+
+    // Validation
+    if (!description || typeof description !== "string" || description.trim().length === 0) {
+      throw new ApiErrors(400, "Description is required for category prediction");
+    }
+
+    try {
+      // Get prediction from ML service
+      const prediction: PredictionResponse = await mlService.predictCategory(description);
+      
+      // Map to standardized category
+      const standardCategory = mlService.mapToStandardCategory(prediction.category);
+
+      const result = {
+        originalCategory: prediction.category,
+        category: standardCategory,
+        confidence: prediction.confidence,
+        description: description.trim(),
+        isHighConfidence: prediction.confidence >= 0.4,
+        suggestFeedback: prediction.confidence < 0.4 || standardCategory === 'Unknown'
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, result, "Category prediction completed successfully")
+      );
+    } catch (error) {
+      console.error("Prediction error:", error);
+      
+      // Return fallback response
+      const fallbackResult = {
+        originalCategory: 'Unknown',
+        category: 'Unknown',
+        confidence: 0,
+        description: description.trim(),
+        isHighConfidence: false,
+        suggestFeedback: true,
+        mlServiceDown: true
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, fallbackResult, "ML service unavailable, returned fallback prediction")
+      );
+    }
+  }
+);
+
+// Send Feedback for Expense Category Prediction
+const sendExpenseCategoryFeedback = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { description, category } = req.body;
+
+    // Validation
+    if (!description || typeof description !== "string" || description.trim().length === 0) {
+      throw new ApiErrors(400, "Description is required for feedback");
+    }
+
+    if (!category || typeof category !== "string" || category.trim().length === 0) {
+      throw new ApiErrors(400, "Category is required for feedback");
+    }
+
+    // Validate category is one of the standard categories
+    const standardCategories = [
+      'Salary', 'Shopping', 'Education', 'Health', 'Utilities', 
+      'Entertainment', 'Transportation', 'Food', 'Unknown'
+    ];
+
+    if (!standardCategories.includes(category.trim())) {
+      throw new ApiErrors(400, `Category must be one of: ${standardCategories.join(', ')}`);
+    }
+
+    try {
+      // Send feedback to ML service
+      const feedbackResponse: FeedbackResponse = await mlService.sendFeedback(
+        description.trim(), 
+        category.trim()
+      );
+
+      const result = {
+        message: feedbackResponse.message,
+        description: description.trim(),
+        category: category.trim(),
+        feedbackCount: feedbackResponse.feedback_count,
+        totalClasses: feedbackResponse.total_classes,
+        availableClasses: feedbackResponse.classes
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, result, "Feedback sent successfully")
+      );
+    } catch (error) {
+      console.error("Feedback error:", error);
+      
+      // Still return success even if ML service is down
+      const fallbackResult = {
+        message: "Feedback received but ML service unavailable",
+        description: description.trim(),
+        category: category.trim(),
+        mlServiceDown: true
+      };
+
+      res.status(200).json(
+        new ApiResponse(200, fallbackResult, "Feedback received (ML service unavailable)")
+      );
+    }
+  }
+);
+
 export {
   addExpense,
   getAllExpenses,
@@ -430,4 +708,6 @@ export {
   downloadExpenseExcel,
   getExpenseStats,
   getMonthlyExpenseTrends,
+  predictExpenseCategory,
+  sendExpenseCategoryFeedback,
 };

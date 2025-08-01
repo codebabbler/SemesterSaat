@@ -8,6 +8,9 @@ interface IIncome extends Document {
   source: string;
   amount: number;
   date: Date;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
+  nextRecurringDate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +36,23 @@ const incomeSchema = new Schema(
     date: {
       type: Date,
       default: Date.now,
+    },
+    isRecurring: {
+      type: Boolean,
+      default: false,
+    },
+    recurringPeriod: {
+      type: String,
+      enum: ["daily", "weekly", "monthly", "yearly"],
+      required: function(this: IIncome) {
+        return this.isRecurring;
+      },
+    },
+    nextRecurringDate: {
+      type: Date,
+      required: function(this: IIncome) {
+        return this.isRecurring;
+      },
     },
   },
   { timestamps: true }

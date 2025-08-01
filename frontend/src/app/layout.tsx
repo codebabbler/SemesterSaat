@@ -7,7 +7,7 @@ import UserProvider from "~/context/UserContext";
 import ErrorBoundary from "~/components/ErrorBoundary";
 
 export const metadata: Metadata = {
-  title: "Expense Tracker",
+  title: "Smart Finance Tracker",
   description: "Track your expenses and income",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };

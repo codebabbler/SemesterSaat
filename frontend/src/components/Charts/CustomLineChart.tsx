@@ -15,6 +15,8 @@ interface ChartData {
   month?: string;
   category?: string;
   amount: number;
+  hasRecurring?: boolean;
+  hasVirtual?: boolean;
 }
 
 interface TooltipPayload {
@@ -45,6 +47,12 @@ const CustomLineChart: React.FC<CustomLineChartProps> = ({ data }) => {
               {formatCurrency(payload[0].payload.amount)}
             </span>
           </p>
+          {payload[0].payload.hasRecurring && (
+            <p className="text-xs text-blue-600">🔄 Recurring</p>
+          )}
+          {payload[0].payload.hasVirtual && (
+            <p className="text-xs text-purple-600">🔮 Predicted</p>
+          )}
         </div>
       );
     }
@@ -53,6 +61,20 @@ const CustomLineChart: React.FC<CustomLineChartProps> = ({ data }) => {
 
   return (
     <div className="bg-white">
+      <div className="mb-4 flex flex-wrap gap-4 text-xs">
+        <div className="flex items-center gap-1">
+          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#ab8df8' }}></div>
+          <span>Regular</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
+          <span>Recurring</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#a855f7' }}></div>
+          <span>Predicted</span>
+        </div>
+      </div>
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data}>
           <defs>
@@ -77,7 +99,13 @@ const CustomLineChart: React.FC<CustomLineChartProps> = ({ data }) => {
             stroke="#875cf5"
             fill="url(#incomeGradient)"
             strokeWidth={3}
-            dot={{ r: 3, fill: "#ab8df8" }}
+            dot={(props: { cx?: number; cy?: number; payload?: ChartData }) => {
+              const { cx, cy, payload } = props;
+              let color = "#ab8df8"; // default
+              if (payload?.hasVirtual) color = "#a855f7"; // purple for predicted
+              else if (payload?.hasRecurring) color = "#3b82f6"; // blue for recurring
+              return <circle cx={cx} cy={cy} r={3} fill={color} stroke={color} strokeWidth={2} />;
+            }}
           />
         </AreaChart>
       </ResponsiveContainer>

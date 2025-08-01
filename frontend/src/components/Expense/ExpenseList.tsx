@@ -11,6 +11,10 @@ interface Transaction {
   icon?: string;
   date: string;
   amount: number;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
+  isVirtual?: boolean;
+  originalId?: string;
 }
 
 interface ExpenseListProps {
@@ -43,7 +47,11 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
             date={moment(expense.date).format("Do MMM YYYY")}
             amount={expense.amount}
             type="expense"
-            onDelete={() => onDelete(expense._id)}
+            onDelete={() => onDelete(expense.originalId ?? expense._id)}
+            isRecurring={expense.isRecurring}
+            recurringPeriod={expense.recurringPeriod}
+            isVirtual={expense.isVirtual}
+            hideDeleteBtn={expense.isVirtual}
           />
         ))}
       </div>

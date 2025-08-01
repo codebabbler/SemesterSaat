@@ -9,6 +9,8 @@ import {
   downloadExpenseExcel,
   getExpenseStats,
   getMonthlyExpenseTrends,
+  predictExpenseCategory,
+  sendExpenseCategoryFeedback,
 } from "../controllers/expense.controller";
 import { verifyJWT } from "../middleware/auth.middleware";
 
@@ -26,6 +28,13 @@ router.route("/trends/monthly")
 
 router.route("/download/excel")
   .get(downloadExpenseExcel); // GET /api/v1/expense/download/excel - Download Excel report
+
+// ML prediction endpoints
+router.route("/predict-category")
+  .post(predictExpenseCategory); // POST /api/v1/expense/predict-category - Predict expense category
+
+router.route("/feedback-category")
+  .post(sendExpenseCategoryFeedback); // POST /api/v1/expense/feedback-category - Send category feedback
 
 // Category-based filtering
 router.route("/category/:category")
