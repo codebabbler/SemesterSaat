@@ -3,6 +3,7 @@ import type { IExpense } from "../models/expense.models";
 import ApiErrors from "../utils/ApiErrors";
 import AnomalyService from "./anomaly.service";
 import type { AnomalyResult } from "../utils/AnomalyDetector";
+import { mlService, type PredictionResponse, type FeedbackResponse } from "./mlService";
 import * as xlsx from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
@@ -13,6 +14,8 @@ interface ExpenseCreationData {
   category: string;
   amount: number;
   date: Date;
+  isRecurring?: boolean;
+  recurringPeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly';
 }
 
 interface ExpenseUpdateData {
@@ -20,6 +23,8 @@ interface ExpenseUpdateData {
   category?: string;
   amount?: number;
   date?: Date;
+  isRecurring?: boolean;
+  recurringPeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly';
 }
 
 interface ExpenseWithAnomaly {
@@ -32,6 +37,7 @@ interface PaginationOptions {
   limit: number;
   sortBy: string;
   sortOrder: 'asc' | 'desc';
+  predictive?: boolean;
 }
 
 interface PaginatedExpenseResult {
@@ -66,9 +72,44 @@ interface ExpenseStats {
   }>;
 }
 
+interface VirtualExpenseTransaction {
+  _id: string;
+  userId: string;
+  icon?: string;
+  category: string;
+  amount: number;
+  date: Date;
+  isVirtual: boolean;
+  originalId: string;
+  isRecurring: boolean;
+  recurringPeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface ExpenseCategoryPrediction {
+  originalCategory: string;
+  category: string;
+  confidence: number;
+  description: string;
+  isHighConfidence: boolean;
+  suggestFeedback: boolean;
+  mlServiceDown?: boolean;
+}
+
+interface ExpenseCategoryFeedbackResult {
+  message: string;
+  description: string;
+  category: string;
+  feedbackCount?: number;
+  totalClasses?: number;
+  availableClasses?: string[];
+  mlServiceDown?: boolean;
+}
+
 class ExpenseService {
   async createExpense(expenseData: ExpenseCreationData): Promise<ExpenseWithAnomaly> {
-    const { userId, icon, category, amount, date } = expenseData;
+    const { userId, icon, category, amount, date, isRecurring, recurringPeriod } = expenseData;
 
     // Validation
     if ([category, amount, date].some(
@@ -85,6 +126,35 @@ class ExpenseService {
       throw new ApiErrors(400, "Invalid date format");
     }
 
+    // Validate recurring fields
+    if (isRecurring && !recurringPeriod) {
+      throw new ApiErrors(400, "Recurring period is required for recurring expenses");
+    }
+
+    if (isRecurring && !["daily", "weekly", "monthly", "yearly"].includes(recurringPeriod!)) {
+      throw new ApiErrors(400, "Invalid recurring period");
+    }
+
+    // Calculate next recurring date
+    let nextRecurringDate: Date | undefined;
+    if (isRecurring && recurringPeriod) {
+      const baseDate = new Date(date);
+      switch (recurringPeriod) {
+        case "daily":
+          nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 1));
+          break;
+        case "weekly":
+          nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 7));
+          break;
+        case "monthly":
+          nextRecurringDate = new Date(baseDate.setMonth(baseDate.getMonth() + 1));
+          break;
+        case "yearly":
+          nextRecurringDate = new Date(baseDate.setFullYear(baseDate.getFullYear() + 1));
+          break;
+      }
+    }
+
     // Create expense
     const expense = await Expense.create({
       userId,
@@ -92,6 +162,9 @@ class ExpenseService {
       category: category.trim(),
       amount,
       date,
+      isRecurring: isRecurring || false,
+      recurringPeriod: isRecurring ? recurringPeriod : undefined,
+      nextRecurringDate,
     });
 
     // Detect anomaly
@@ -126,7 +199,7 @@ class ExpenseService {
   }
 
   async getAllExpenses(userId: string, options: PaginationOptions): Promise<PaginatedExpenseResult> {
-    const { page, limit, sortBy, sortOrder } = options;
+    const { page, limit, sortBy, sortOrder, predictive = false } = options;
 
     // Validate pagination parameters
     if (page < 1 || limit < 1) {
@@ -140,17 +213,49 @@ class ExpenseService {
     const skip = (page - 1) * limit;
     const sortDirection = sortOrder === "asc" ? 1 : -1;
 
-    const [expenses, totalCount] = await Promise.all([
-      Expense.find({ userId })
-        .sort({ [sortBy]: sortDirection })
-        .skip(skip)
-        .limit(limit)
-        .select("-__v"),
-      Expense.countDocuments({ userId })
-    ]);
+    // Build query filter
+    const filter: any = { userId };
+    
+    // If not in predictive mode, filter out future dates
+    if (!predictive) {
+      filter.date = { $lte: new Date() };
+    }
+
+    const expenses = await Expense.find(filter)
+      .sort({ [sortBy]: sortDirection })
+      .select("-__v");
+
+    let allExpenses = [...expenses];
+    
+    // Generate recurring expenses if in predictive mode
+    if (predictive) {
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 3); // Show 3 months ahead
+      
+      const recurringExpenses = await Expense.find({
+        userId,
+        isRecurring: true
+      });
+      
+      recurringExpenses.forEach(expense => {
+        const generated = this.generateRecurringExpenses(expense, endDate);
+        allExpenses.push(...generated);
+      });
+    }
+    
+    // Sort all expenses
+    allExpenses.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return sortDirection === 1 ? dateA - dateB : dateB - dateA;
+    });
+    
+    // Apply pagination
+    const paginatedExpenses = allExpenses.slice(skip, skip + limit);
+    const totalCount = allExpenses.length;
 
     return {
-      expenses,
+      expenses: paginatedExpenses,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(totalCount / limit),
@@ -200,6 +305,37 @@ class ExpenseService {
         throw new ApiErrors(400, "Invalid date format");
       }
       updateFields.date = updateData.date;
+    }
+    if (updateData.isRecurring !== undefined) {
+      updateFields.isRecurring = updateData.isRecurring;
+      if (updateData.isRecurring && !updateData.recurringPeriod) {
+        throw new ApiErrors(400, "Recurring period is required for recurring expenses");
+      }
+    }
+    if (updateData.recurringPeriod !== undefined) {
+      if (!["daily", "weekly", "monthly", "yearly"].includes(updateData.recurringPeriod)) {
+        throw new ApiErrors(400, "Invalid recurring period");
+      }
+      updateFields.recurringPeriod = updateData.recurringPeriod;
+      
+      // Recalculate next recurring date if recurring
+      if (updateFields.isRecurring || (updateFields.isRecurring === undefined && updateData.isRecurring)) {
+        const baseDate = new Date(updateFields.date || updateData.date!);
+        switch (updateData.recurringPeriod) {
+          case "daily":
+            updateFields.nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 1));
+            break;
+          case "weekly":
+            updateFields.nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 7));
+            break;
+          case "monthly":
+            updateFields.nextRecurringDate = new Date(baseDate.setMonth(baseDate.getMonth() + 1));
+            break;
+          case "yearly":
+            updateFields.nextRecurringDate = new Date(baseDate.setFullYear(baseDate.getFullYear() + 1));
+            break;
+        }
+      }
     }
 
     const updatedExpense = await Expense.findOneAndUpdate(
@@ -440,6 +576,164 @@ class ExpenseService {
   async deleteAllExpensesByUser(userId: string): Promise<void> {
     await Expense.deleteMany({ userId });
   }
+
+  // Helper function to generate recurring expenses
+  private generateRecurringExpenses(baseExpense: any, endDate: Date): VirtualExpenseTransaction[] {
+    const recurringExpenses: VirtualExpenseTransaction[] = [];
+    const { date, recurringPeriod, isRecurring } = baseExpense;
+    
+    if (!isRecurring || !recurringPeriod) {
+      return [];
+    }
+    
+    let currentDate = new Date(date);
+    const today = new Date();
+    
+    // If the base date is in the past, start from the next occurrence after today
+    if (currentDate < today) {
+      while (currentDate < today) {
+        switch (recurringPeriod) {
+          case "daily":
+            currentDate.setDate(currentDate.getDate() + 1);
+            break;
+          case "weekly":
+            currentDate.setDate(currentDate.getDate() + 7);
+            break;
+          case "monthly":
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            break;
+          case "yearly":
+            currentDate.setFullYear(currentDate.getFullYear() + 1);
+            break;
+        }
+      }
+    }
+    
+    // Generate recurring entries up to endDate
+    while (currentDate <= endDate) {
+      const virtualTransaction: VirtualExpenseTransaction = {
+        _id: `${baseExpense._id}_${currentDate.getTime()}`,
+        userId: baseExpense.userId,
+        icon: baseExpense.icon,
+        category: baseExpense.category,
+        amount: baseExpense.amount,
+        date: new Date(currentDate),
+        isVirtual: true,
+        originalId: baseExpense._id,
+        isRecurring: baseExpense.isRecurring,
+        recurringPeriod: baseExpense.recurringPeriod,
+        createdAt: baseExpense.createdAt,
+        updatedAt: baseExpense.updatedAt
+      };
+      
+      recurringExpenses.push(virtualTransaction);
+      
+      // Move to next occurrence
+      switch (recurringPeriod) {
+        case "daily":
+          currentDate.setDate(currentDate.getDate() + 1);
+          break;
+        case "weekly":
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+        case "monthly":
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+        case "yearly":
+          currentDate.setFullYear(currentDate.getFullYear() + 1);
+          break;
+      }
+    }
+    
+    return recurringExpenses;
+  }
+
+  // Predict Expense Category using ML
+  async predictExpenseCategory(description: string): Promise<ExpenseCategoryPrediction> {
+    // Validation
+    if (!description || typeof description !== "string" || description.trim().length === 0) {
+      throw new ApiErrors(400, "Description is required for category prediction");
+    }
+
+    try {
+      // Get prediction from ML service
+      const prediction: PredictionResponse = await mlService.predictCategory(description);
+      
+      // Map to standardized category
+      const standardCategory = mlService.mapToStandardCategory(prediction.category);
+
+      return {
+        originalCategory: prediction.category,
+        category: standardCategory,
+        confidence: prediction.confidence,
+        description: description.trim(),
+        isHighConfidence: prediction.confidence >= 0.4,
+        suggestFeedback: prediction.confidence < 0.4 || standardCategory === 'Unknown'
+      };
+    } catch (error) {
+      console.error("Prediction error:", error);
+      
+      // Return fallback response
+      return {
+        originalCategory: 'Unknown',
+        category: 'Unknown',
+        confidence: 0,
+        description: description.trim(),
+        isHighConfidence: false,
+        suggestFeedback: true,
+        mlServiceDown: true
+      };
+    }
+  }
+
+  // Send Feedback for Expense Category Prediction
+  async sendExpenseCategoryFeedback(description: string, category: string): Promise<ExpenseCategoryFeedbackResult> {
+    // Validation
+    if (!description || typeof description !== "string" || description.trim().length === 0) {
+      throw new ApiErrors(400, "Description is required for feedback");
+    }
+
+    if (!category || typeof category !== "string" || category.trim().length === 0) {
+      throw new ApiErrors(400, "Category is required for feedback");
+    }
+
+    // Validate category is one of the standard categories
+    const standardCategories = [
+      'Salary', 'Shopping', 'Education', 'Health', 'Utilities', 
+      'Entertainment', 'Transportation', 'Food', 'Unknown'
+    ];
+
+    if (!standardCategories.includes(category.trim())) {
+      throw new ApiErrors(400, `Category must be one of: ${standardCategories.join(', ')}`);
+    }
+
+    try {
+      // Send feedback to ML service
+      const feedbackResponse: FeedbackResponse = await mlService.sendFeedback(
+        description.trim(), 
+        category.trim()
+      );
+
+      return {
+        message: feedbackResponse.message,
+        description: description.trim(),
+        category: category.trim(),
+        feedbackCount: feedbackResponse.feedback_count,
+        totalClasses: feedbackResponse.total_classes,
+        availableClasses: feedbackResponse.classes
+      };
+    } catch (error) {
+      console.error("Feedback error:", error);
+      
+      // Still return success even if ML service is down
+      return {
+        message: "Feedback received but ML service unavailable",
+        description: description.trim(),
+        category: category.trim(),
+        mlServiceDown: true
+      };
+    }
+  }
 }
 
 export default new ExpenseService();
@@ -450,5 +744,8 @@ export type {
   PaginationOptions, 
   PaginatedExpenseResult,
   ExpenseStatsFilter,
-  ExpenseStats
+  ExpenseStats,
+  VirtualExpenseTransaction,
+  ExpenseCategoryPrediction,
+  ExpenseCategoryFeedbackResult
 };

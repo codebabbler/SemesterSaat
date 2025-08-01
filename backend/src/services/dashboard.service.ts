@@ -9,9 +9,24 @@ import {
   DashboardResponse,
 } from "../types/dashboard.types";
 
+interface VirtualTransaction {
+  _id: string;
+  userId: string;
+  icon?: string;
+  source?: string;
+  category?: string;
+  amount: number;
+  date: Date;
+  isVirtual: boolean;
+  originalId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface DashboardOptions {
   period?: number;
   limit?: number;
+  predictive?: boolean;
 }
 
 interface FinancialSummaryOptions {
@@ -25,7 +40,7 @@ interface CashFlowOptions {
 
 class DashboardService {
   async getDashboardData(userId: string, options: DashboardOptions = {}): Promise<DashboardResponse> {
-    const { period = 30, limit = 5 } = options;
+    const { period = 30, limit = 5, predictive = false } = options;
     const userObjectId = new Types.ObjectId(userId);
 
     // Validate parameters
@@ -38,6 +53,34 @@ class DashboardService {
     }
 
     try {
+      // Date filter for current vs predictive mode
+      const currentDate = new Date();
+      const dateFilter = predictive ? {} : { date: { $lte: currentDate } };
+
+      // Get recurring transactions for predictive mode
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 3); // Show 3 months ahead
+      
+      // Get all income and expense transactions
+      const [allIncome, allExpenses, recurringIncome, recurringExpenses] = await Promise.all([
+        Income.find({ userId: userObjectId }),
+        Expense.find({ userId: userObjectId }),
+        Income.find({ userId: userObjectId, isRecurring: true }),
+        Expense.find({ userId: userObjectId, isRecurring: true })
+      ]);
+      
+      // Generate recurring transactions for predictive mode
+      const futureIncomeTransactions = predictive ? this.generateRecurringTransactions(recurringIncome, endDate, 'income') : [];
+      const futureExpenseTransactions = predictive ? this.generateRecurringTransactions(recurringExpenses, endDate, 'expense') : [];
+      
+      // Combine all transactions
+      const allIncomeTransactions = predictive ? [...allIncome, ...futureIncomeTransactions] : allIncome;
+      const allExpenseTransactions = predictive ? [...allExpenses, ...futureExpenseTransactions] : allExpenses;
+      
+      // Apply date filters for non-predictive mode
+      const filteredIncomeTransactions = predictive ? allIncomeTransactions : allIncomeTransactions.filter(t => new Date(t.date) <= new Date());
+      const filteredExpenseTransactions = predictive ? allExpenseTransactions : allExpenseTransactions.filter(t => new Date(t.date) <= new Date());
+      
       // Parallel execution for better performance
       const [
         totalIncomeResult,
@@ -51,133 +94,131 @@ class DashboardService {
         monthlyTrends,
       ] = await Promise.all([
         // Total income
-        Income.aggregate([
-          { $match: { userId: userObjectId } },
-          { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
-        ]),
+        Promise.resolve([{ 
+          total: filteredIncomeTransactions.reduce((sum: number, t: any) => sum + t.amount, 0), 
+          count: filteredIncomeTransactions.length 
+        }]),
 
         // Total expenses
-        Expense.aggregate([
-          { $match: { userId: userObjectId } },
-          { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
-        ]),
+        Promise.resolve([{ 
+          total: filteredExpenseTransactions.reduce((sum: number, t: any) => sum + t.amount, 0), 
+          count: filteredExpenseTransactions.length 
+        }]),
 
         // Last 30 days income
-        Income.aggregate([
-          {
-            $match: {
-              userId: userObjectId,
-              date: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-            },
-          },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-              average: { $avg: "$amount" },
-            },
-          },
-        ]),
+        Promise.resolve([{
+          total: allIncomeTransactions
+            .filter((t: any) => new Date(t.date) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+            .reduce((sum: number, t: any) => sum + t.amount, 0),
+          count: allIncomeTransactions
+            .filter((t: any) => new Date(t.date) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+            .length,
+          average: allIncomeTransactions
+            .filter((t: any) => new Date(t.date) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+            .reduce((sum: number, t: any, _, arr: any[]) => sum + t.amount / arr.length, 0)
+        }]),
 
         // Last 60 days income
-        Income.aggregate([
-          {
-            $match: {
-              userId: userObjectId,
-              date: { $gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) },
-            },
-          },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-              average: { $avg: "$amount" },
-            },
-          },
-        ]),
+        Promise.resolve([{
+          total: allIncomeTransactions
+            .filter((t: any) => new Date(t.date) >= new Date(Date.now() - 60 * 24 * 60 * 60 * 1000))
+            .reduce((sum: number, t: any) => sum + t.amount, 0),
+          count: allIncomeTransactions
+            .filter((t: any) => new Date(t.date) >= new Date(Date.now() - 60 * 24 * 60 * 60 * 1000))
+            .length,
+          average: allIncomeTransactions
+            .filter((t: any) => new Date(t.date) >= new Date(Date.now() - 60 * 24 * 60 * 60 * 1000))
+            .reduce((sum: number, t: any, _, arr: any[]) => sum + t.amount / arr.length, 0)
+        }]),
 
         // Recent income transactions
-        Income.find({ userId: userObjectId })
-          .sort({ date: -1 })
-          .limit(limit)
-          .select("-__v"),
+        Promise.resolve(
+          filteredIncomeTransactions
+            .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .slice(0, limit)
+        ),
 
         // Recent expense transactions
-        Expense.find({ userId: userObjectId })
-          .sort({ date: -1 })
-          .limit(limit)
-          .select("-__v"),
+        Promise.resolve(
+          filteredExpenseTransactions
+            .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .slice(0, limit)
+        ),
 
         // Top expense categories
-        Expense.aggregate([
-          { $match: { userId: userObjectId } },
-          {
-            $group: {
-              _id: "$category",
-              amount: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
-          },
-          { $sort: { amount: -1 } },
-          { $limit: 5 },
-        ]),
+        Promise.resolve((() => {
+          const categoryTotals: Record<string, { amount: number; count: number }> = {};
+          filteredExpenseTransactions.forEach((expense: any) => {
+            const category = expense.category || 'Unknown';
+            if (categoryTotals[category]) {
+              categoryTotals[category].amount += expense.amount;
+              categoryTotals[category].count += 1;
+            } else {
+              categoryTotals[category] = { amount: expense.amount, count: 1 };
+            }
+          });
+          return Object.entries(categoryTotals)
+            .map(([category, data]) => ({ _id: category, ...data }))
+            .sort((a, b) => b.amount - a.amount)
+            .slice(0, 5);
+        })()),
 
         // Top income sources
-        Income.aggregate([
-          { $match: { userId: userObjectId } },
-          {
-            $group: {
-              _id: "$source",
-              amount: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
-          },
-          { $sort: { amount: -1 } },
-          { $limit: 5 },
-        ]),
+        Promise.resolve((() => {
+          const sourceTotals: Record<string, { amount: number; count: number }> = {};
+          filteredIncomeTransactions.forEach((income: any) => {
+            const source = income.source || 'Unknown';
+            if (sourceTotals[source]) {
+              sourceTotals[source].amount += income.amount;
+              sourceTotals[source].count += 1;
+            } else {
+              sourceTotals[source] = { amount: income.amount, count: 1 };
+            }
+          });
+          return Object.entries(sourceTotals)
+            .map(([source, data]) => ({ _id: source, ...data }))
+            .sort((a, b) => b.amount - a.amount)
+            .slice(0, 5);
+        })()),
 
         // Monthly trends for the last 12 months
-        Income.aggregate([
-          {
-            $match: {
-              userId: userObjectId,
-              date: { $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) },
-            },
-          },
-          {
-            $group: {
-              _id: {
-                year: { $year: "$date" },
-                month: { $month: "$date" },
-              },
-              income: { $sum: "$amount" },
-            },
-          },
-          { $sort: { "_id.year": 1, "_id.month": 1 } },
-        ]),
+        Promise.resolve((() => {
+          const monthlyTotals: Record<string, number> = {};
+          const cutoffDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+          allIncomeTransactions
+            .filter((income: any) => new Date(income.date) >= cutoffDate)
+            .forEach((income: any) => {
+              const date = new Date(income.date);
+              const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+              monthlyTotals[key] = (monthlyTotals[key] || 0) + income.amount;
+            });
+          return Object.entries(monthlyTotals)
+            .map(([key, income]) => {
+              const [year, month] = key.split('-').map(Number);
+              return { _id: { year, month }, income };
+            })
+            .sort((a, b) => a._id.year - b._id.year || a._id.month - b._id.month);
+        })()),
       ]);
 
       // Get expense trends for the same period
-      const expenseMonthlyTrends = await Expense.aggregate([
-        {
-          $match: {
-            userId: userObjectId,
-            date: { $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) },
-          },
-        },
-        {
-          $group: {
-            _id: {
-              year: { $year: "$date" },
-              month: { $month: "$date" },
-            },
-            expenses: { $sum: "$amount" },
-          },
-        },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
-      ]);
+      const expenseMonthlyTrends = (() => {
+        const monthlyTotals: Record<string, number> = {};
+        const cutoffDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+        allExpenseTransactions
+          .filter((expense: any) => new Date(expense.date) >= cutoffDate)
+          .forEach((expense: any) => {
+            const date = new Date(expense.date);
+            const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+            monthlyTotals[key] = (monthlyTotals[key] || 0) + expense.amount;
+          });
+        return Object.entries(monthlyTotals)
+          .map(([key, expenses]) => {
+            const [year, month] = key.split('-').map(Number);
+            return { _id: { year, month }, expenses };
+          })
+          .sort((a, b) => a._id.year - b._id.year || a._id.month - b._id.month);
+      })();
 
       // Process data
       const totalIncome = totalIncomeResult[0]?.total || 0;
@@ -265,18 +306,24 @@ class DashboardService {
       });
 
       // Get last 30 and 60 days transaction details
+      const last30DaysFilter = {
+        userId: userObjectId,
+        date: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        ...(predictive !== true && { date: { ...{ $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }, $lte: currentDate } })
+      };
+      
+      const last60DaysFilter = {
+        userId: userObjectId,
+        date: { $gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) },
+        ...(predictive !== true && { date: { ...{ $gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) }, $lte: currentDate } })
+      };
+
       const [last30DaysIncomeTransactions, last60DaysIncomeTransactions] = await Promise.all([
-        Income.find({
-          userId: userObjectId,
-          date: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-        })
+        Income.find(last30DaysFilter)
           .sort({ date: -1 })
           .select("-__v"),
         
-        Income.find({
-          userId: userObjectId,
-          date: { $gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) },
-        })
+        Income.find(last60DaysFilter)
           .sort({ date: -1 })
           .select("-__v"),
       ]);
@@ -539,6 +586,78 @@ class DashboardService {
         expenseTransactions: expenseCount,
       },
     };
+  }
+
+  // Helper function to generate recurring transactions for dashboard
+  private generateRecurringTransactions(transactions: any[], endDate: Date, type: 'income' | 'expense'): VirtualTransaction[] {
+    const recurringTransactions: VirtualTransaction[] = [];
+    
+    transactions.forEach(transaction => {
+      const { date, recurringPeriod, isRecurring } = transaction;
+      
+      if (!isRecurring || !recurringPeriod) {
+        return;
+      }
+      
+      let currentDate = new Date(date);
+      const today = new Date();
+      
+      // If the base date is in the past, start from the next occurrence after today
+      if (currentDate < today) {
+        while (currentDate < today) {
+          switch (recurringPeriod) {
+            case "daily":
+              currentDate.setDate(currentDate.getDate() + 1);
+              break;
+            case "weekly":
+              currentDate.setDate(currentDate.getDate() + 7);
+              break;
+            case "monthly":
+              currentDate.setMonth(currentDate.getMonth() + 1);
+              break;
+            case "yearly":
+              currentDate.setFullYear(currentDate.getFullYear() + 1);
+              break;
+          }
+        }
+      }
+      
+      // Generate recurring entries up to endDate
+      while (currentDate <= endDate) {
+        const recurringTransaction: VirtualTransaction = {
+          _id: `${transaction._id}_${currentDate.getTime()}`,
+          userId: transaction.userId,
+          icon: transaction.icon,
+          ...(type === 'income' ? { source: transaction.source } : { category: transaction.category }),
+          amount: transaction.amount,
+          date: new Date(currentDate),
+          isVirtual: true,
+          originalId: transaction._id,
+          createdAt: transaction.createdAt,
+          updatedAt: transaction.updatedAt
+        };
+        
+        recurringTransactions.push(recurringTransaction);
+        
+        // Move to next occurrence
+        switch (recurringPeriod) {
+          case "daily":
+            currentDate.setDate(currentDate.getDate() + 1);
+            break;
+          case "weekly":
+            currentDate.setDate(currentDate.getDate() + 7);
+            break;
+          case "monthly":
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            break;
+          case "yearly":
+            currentDate.setFullYear(currentDate.getFullYear() + 1);
+            break;
+        }
+      }
+    });
+    
+    return recurringTransactions;
   }
 }
 

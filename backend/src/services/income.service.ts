@@ -3,6 +3,7 @@ import type { IIncome } from "../models/income.models";
 import ApiErrors from "../utils/ApiErrors";
 import AnomalyService from "./anomaly.service";
 import type { AnomalyResult } from "../utils/AnomalyDetector";
+import { mlService, type PredictionResponse, type FeedbackResponse } from "./mlService";
 import * as xlsx from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
@@ -13,6 +14,8 @@ interface IncomeCreationData {
   source: string;
   amount: number;
   date: Date;
+  isRecurring?: boolean;
+  recurringPeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly';
 }
 
 interface IncomeUpdateData {
@@ -20,6 +23,8 @@ interface IncomeUpdateData {
   source?: string;
   amount?: number;
   date?: Date;
+  isRecurring?: boolean;
+  recurringPeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly';
 }
 
 interface IncomeWithAnomaly {
@@ -32,6 +37,7 @@ interface PaginationOptions {
   limit: number;
   sortBy: string;
   sortOrder: 'asc' | 'desc';
+  predictive?: boolean;
 }
 
 interface PaginatedIncomeResult {
@@ -57,9 +63,44 @@ interface IncomeStats {
   minIncome: number;
 }
 
+interface VirtualIncomeTransaction {
+  _id: string;
+  userId: string;
+  icon?: string;
+  source: string;
+  amount: number;
+  date: Date;
+  isVirtual: boolean;
+  originalId: string;
+  isRecurring: boolean;
+  recurringPeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface IncomeSourcePrediction {
+  originalSource: string;
+  source: string;
+  confidence: number;
+  description: string;
+  isHighConfidence: boolean;
+  suggestFeedback: boolean;
+  mlServiceDown?: boolean;
+}
+
+interface IncomeSourceFeedbackResult {
+  message: string;
+  description: string;
+  source: string;
+  feedbackCount?: number;
+  totalClasses?: number;
+  availableClasses?: string[];
+  mlServiceDown?: boolean;
+}
+
 class IncomeService {
   async createIncome(incomeData: IncomeCreationData): Promise<IncomeWithAnomaly> {
-    const { userId, icon, source, amount, date } = incomeData;
+    const { userId, icon, source, amount, date, isRecurring, recurringPeriod } = incomeData;
 
     // Validation
     if ([source, amount, date].some(
@@ -76,6 +117,35 @@ class IncomeService {
       throw new ApiErrors(400, "Invalid date format");
     }
 
+    // Validate recurring fields
+    if (isRecurring && !recurringPeriod) {
+      throw new ApiErrors(400, "Recurring period is required for recurring income");
+    }
+
+    if (isRecurring && !["daily", "weekly", "monthly", "yearly"].includes(recurringPeriod!)) {
+      throw new ApiErrors(400, "Invalid recurring period");
+    }
+
+    // Calculate next recurring date
+    let nextRecurringDate: Date | undefined;
+    if (isRecurring && recurringPeriod) {
+      const baseDate = new Date(date);
+      switch (recurringPeriod) {
+        case "daily":
+          nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 1));
+          break;
+        case "weekly":
+          nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 7));
+          break;
+        case "monthly":
+          nextRecurringDate = new Date(baseDate.setMonth(baseDate.getMonth() + 1));
+          break;
+        case "yearly":
+          nextRecurringDate = new Date(baseDate.setFullYear(baseDate.getFullYear() + 1));
+          break;
+      }
+    }
+
     // Create income
     const income = await Income.create({
       userId,
@@ -83,6 +153,9 @@ class IncomeService {
       source: source.trim(),
       amount,
       date,
+      isRecurring: isRecurring || false,
+      recurringPeriod: isRecurring ? recurringPeriod : undefined,
+      nextRecurringDate,
     });
 
     // Detect anomaly
@@ -117,7 +190,7 @@ class IncomeService {
   }
 
   async getAllIncome(userId: string, options: PaginationOptions): Promise<PaginatedIncomeResult> {
-    const { page, limit, sortBy, sortOrder } = options;
+    const { page, limit, sortBy, sortOrder, predictive = false } = options;
 
     // Validate pagination parameters
     if (page < 1 || limit < 1) {
@@ -131,17 +204,49 @@ class IncomeService {
     const skip = (page - 1) * limit;
     const sortDirection = sortOrder === "asc" ? 1 : -1;
 
-    const [income, totalCount] = await Promise.all([
-      Income.find({ userId })
-        .sort({ [sortBy]: sortDirection })
-        .skip(skip)
-        .limit(limit)
-        .select("-__v"),
-      Income.countDocuments({ userId })
-    ]);
+    // Build query filter
+    const filter: any = { userId };
+    
+    // If not in predictive mode, filter out future dates
+    if (!predictive) {
+      filter.date = { $lte: new Date() };
+    }
+
+    const income = await Income.find(filter)
+      .sort({ [sortBy]: sortDirection })
+      .select("-__v");
+
+    let allIncome = [...income];
+    
+    // Generate recurring income if in predictive mode
+    if (predictive) {
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 3); // Show 3 months ahead
+      
+      const recurringIncome = await Income.find({
+        userId,
+        isRecurring: true
+      });
+      
+      recurringIncome.forEach(income => {
+        const generated = this.generateRecurringIncome(income, endDate);
+        allIncome.push(...generated);
+      });
+    }
+    
+    // Sort all income
+    allIncome.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return sortDirection === 1 ? dateA - dateB : dateB - dateA;
+    });
+    
+    // Apply pagination
+    const paginatedIncome = allIncome.slice(skip, skip + limit);
+    const totalCount = allIncome.length;
 
     return {
-      income,
+      income: paginatedIncome,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(totalCount / limit),
@@ -191,6 +296,37 @@ class IncomeService {
         throw new ApiErrors(400, "Invalid date format");
       }
       updateFields.date = updateData.date;
+    }
+    if (updateData.isRecurring !== undefined) {
+      updateFields.isRecurring = updateData.isRecurring;
+      if (updateData.isRecurring && !updateData.recurringPeriod) {
+        throw new ApiErrors(400, "Recurring period is required for recurring income");
+      }
+    }
+    if (updateData.recurringPeriod !== undefined) {
+      if (!["daily", "weekly", "monthly", "yearly"].includes(updateData.recurringPeriod)) {
+        throw new ApiErrors(400, "Invalid recurring period");
+      }
+      updateFields.recurringPeriod = updateData.recurringPeriod;
+      
+      // Recalculate next recurring date if recurring
+      if (updateFields.isRecurring || (updateFields.isRecurring === undefined && updateData.isRecurring)) {
+        const baseDate = new Date(updateFields.date || updateData.date!);
+        switch (updateData.recurringPeriod) {
+          case "daily":
+            updateFields.nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 1));
+            break;
+          case "weekly":
+            updateFields.nextRecurringDate = new Date(baseDate.setDate(baseDate.getDate() + 7));
+            break;
+          case "monthly":
+            updateFields.nextRecurringDate = new Date(baseDate.setMonth(baseDate.getMonth() + 1));
+            break;
+          case "yearly":
+            updateFields.nextRecurringDate = new Date(baseDate.setFullYear(baseDate.getFullYear() + 1));
+            break;
+        }
+      }
     }
 
     const updatedIncome = await Income.findOneAndUpdate(
@@ -437,6 +573,181 @@ class IncomeService {
   async deleteAllIncomeByUser(userId: string): Promise<void> {
     await Income.deleteMany({ userId });
   }
+
+  // Helper function to generate recurring income
+  private generateRecurringIncome(baseIncome: any, endDate: Date): VirtualIncomeTransaction[] {
+    const recurringIncome: VirtualIncomeTransaction[] = [];
+    const { date, recurringPeriod, isRecurring } = baseIncome;
+    
+    if (!isRecurring || !recurringPeriod) {
+      return [];
+    }
+    
+    let currentDate = new Date(date);
+    const today = new Date();
+    
+    // If the base date is in the past, start from the next occurrence after today
+    if (currentDate < today) {
+      while (currentDate < today) {
+        switch (recurringPeriod) {
+          case "daily":
+            currentDate.setDate(currentDate.getDate() + 1);
+            break;
+          case "weekly":
+            currentDate.setDate(currentDate.getDate() + 7);
+            break;
+          case "monthly":
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            break;
+          case "yearly":
+            currentDate.setFullYear(currentDate.getFullYear() + 1);
+            break;
+        }
+      }
+    }
+    
+    // Generate recurring entries up to endDate
+    while (currentDate <= endDate) {
+      const virtualTransaction: VirtualIncomeTransaction = {
+        _id: `${baseIncome._id}_${currentDate.getTime()}`,
+        userId: baseIncome.userId,
+        icon: baseIncome.icon,
+        source: baseIncome.source,
+        amount: baseIncome.amount,
+        date: new Date(currentDate),
+        isVirtual: true,
+        originalId: baseIncome._id,
+        isRecurring: baseIncome.isRecurring,
+        recurringPeriod: baseIncome.recurringPeriod,
+        createdAt: baseIncome.createdAt,
+        updatedAt: baseIncome.updatedAt
+      };
+      
+      recurringIncome.push(virtualTransaction);
+      
+      // Move to next occurrence
+      switch (recurringPeriod) {
+        case "daily":
+          currentDate.setDate(currentDate.getDate() + 1);
+          break;
+        case "weekly":
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+        case "monthly":
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+        case "yearly":
+          currentDate.setFullYear(currentDate.getFullYear() + 1);
+          break;
+      }
+    }
+    
+    return recurringIncome;
+  }
+
+  // Predict Income Source using ML
+  async predictIncomeSource(description: string): Promise<IncomeSourcePrediction> {
+    // Validation
+    if (!description || typeof description !== "string" || description.trim().length === 0) {
+      throw new ApiErrors(400, "Description is required for source prediction");
+    }
+
+    try {
+      // Get prediction from ML service
+      const prediction: PredictionResponse = await mlService.predictCategory(description);
+      
+      // Map to income-relevant categories (treat as source)
+      let sourceCategory = prediction.category;
+      
+      // Map some expense categories to income sources
+      const incomeSourceMappings: Record<string, string> = {
+        'Food': 'Salary',
+        'Shopping': 'Salary', 
+        'Transportation': 'Salary',
+        'Health': 'Salary',
+        'Education': 'Salary',
+        'Utilities': 'Salary',
+        'Entertainment': 'Salary',
+        'Salary': 'Salary',
+        'Unknown': 'Unknown'
+      };
+
+      sourceCategory = incomeSourceMappings[prediction.category] || 'Salary';
+
+      return {
+        originalSource: prediction.category,
+        source: sourceCategory,
+        confidence: prediction.confidence,
+        description: description.trim(),
+        isHighConfidence: prediction.confidence >= 0.4,
+        suggestFeedback: prediction.confidence < 0.4 || sourceCategory === 'Unknown'
+      };
+    } catch (error) {
+      console.error("Income prediction error:", error);
+      
+      // Return fallback response
+      return {
+        originalSource: 'Unknown',
+        source: 'Salary',
+        confidence: 0,
+        description: description.trim(),
+        isHighConfidence: false,
+        suggestFeedback: true,
+        mlServiceDown: true
+      };
+    }
+  }
+
+  // Send Feedback for Income Source Prediction
+  async sendIncomeSourceFeedback(description: string, source: string): Promise<IncomeSourceFeedbackResult> {
+    // Validation
+    if (!description || typeof description !== "string" || description.trim().length === 0) {
+      throw new ApiErrors(400, "Description is required for feedback");
+    }
+
+    if (!source || typeof source !== "string" || source.trim().length === 0) {
+      throw new ApiErrors(400, "Source is required for feedback");
+    }
+
+    // Validate source is reasonable for income
+    const commonIncomeSources = [
+      'Salary', 'Freelance', 'Business', 'Investment', 'Rental', 
+      'Part-time', 'Commission', 'Bonus', 'Unknown'
+    ];
+
+    const providedSource = source.trim();
+    // Allow any source, but log if it's not in common list
+    if (!commonIncomeSources.includes(providedSource)) {
+      console.log(`New income source provided: ${providedSource}`);
+    }
+
+    try {
+      // Send feedback to ML service (treat income source as category for ML training)
+      const feedbackResponse: FeedbackResponse = await mlService.sendFeedback(
+        description.trim(), 
+        providedSource
+      );
+
+      return {
+        message: feedbackResponse.message,
+        description: description.trim(),
+        source: providedSource,
+        feedbackCount: feedbackResponse.feedback_count,
+        totalClasses: feedbackResponse.total_classes,
+        availableClasses: feedbackResponse.classes
+      };
+    } catch (error) {
+      console.error("Income feedback error:", error);
+      
+      // Still return success even if ML service is down
+      return {
+        message: "Feedback received but ML service unavailable",
+        description: description.trim(),
+        source: providedSource,
+        mlServiceDown: true
+      };
+    }
+  }
 }
 
 export default new IncomeService();
@@ -447,5 +758,8 @@ export type {
   PaginationOptions, 
   PaginatedIncomeResult,
   IncomeStatsFilter,
-  IncomeStats
+  IncomeStats,
+  VirtualIncomeTransaction,
+  IncomeSourcePrediction,
+  IncomeSourceFeedbackResult
 };
