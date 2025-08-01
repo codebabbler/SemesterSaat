@@ -235,9 +235,11 @@ class ExpenseService {
       throw new ApiErrors(400, "Category is required");
     }
 
+    // Sanitize category input to prevent NoSQL injection
+    const sanitizedCategory = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const expenses = await Expense.find({ 
       userId, 
-      category: { $regex: new RegExp(category, "i") } 
+      category: { $regex: new RegExp(sanitizedCategory, "i") } 
     })
       .sort({ date: -1 })
       .select("-__v");
