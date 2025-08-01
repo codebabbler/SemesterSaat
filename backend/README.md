@@ -25,7 +25,7 @@ This is the backend API for the Personal Expenses Tracker application, an academ
 
 ## Project Overview
 
-This project is a RESTful API for a personal expense tracker application. It allows users to register, log in, and manage their income and expenses. The API also provides endpoints for a dashboard with financial summaries and analysis.
+This project is a RESTful API for a personal Smart Finance Tracker application. It allows users to register, log in, and manage their income and expenses. The API also provides endpoints for a dashboard with financial summaries and analysis.
 
 ## Features
 

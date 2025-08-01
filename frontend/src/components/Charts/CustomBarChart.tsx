@@ -16,6 +16,8 @@ interface ChartData {
   month?: string;
   category?: string;
   amount: number;
+  hasRecurring?: boolean;
+  hasVirtual?: boolean;
 }
 
 interface TooltipPayload {
@@ -27,9 +29,15 @@ interface CustomBarChartProps {
 }
 
 const CustomBarChart: React.FC<CustomBarChartProps> = ({ data }) => {
-  // Function to alternate colors
-  const getBarColor = (index: number) => {
-    return index % 2 === 0 ? "#875cf5" : "#cfbefb";
+  // Function to get bar color based on entry type
+  const getBarColor = (entry: ChartData, index: number) => {
+    if (entry.hasVirtual) {
+      return "#a855f7"; // Purple for predicted/virtual entries
+    }
+    if (entry.hasRecurring) {
+      return "#3b82f6"; // Blue for recurring entries
+    }
+    return index % 2 === 0 ? "#875cf5" : "#cfbefb"; // Default alternating colors
   };
 
   // Determine which field to use for X-axis based on data structure
@@ -62,6 +70,12 @@ const CustomBarChart: React.FC<CustomBarChartProps> = ({ data }) => {
               {formatCurrency(data.amount)}
             </span>
           </p>
+          {data.hasRecurring && (
+            <p className="text-xs text-blue-600">🔄 Recurring</p>
+          )}
+          {data.hasVirtual && (
+            <p className="text-xs text-purple-600">🔮 Predicted</p>
+          )}
         </div>
       );
     }
@@ -70,6 +84,20 @@ const CustomBarChart: React.FC<CustomBarChartProps> = ({ data }) => {
 
   return (
     <div className="mt-6 bg-white">
+      <div className="mb-4 flex flex-wrap gap-4 text-xs">
+        <div className="flex items-center gap-1">
+          <div className="h-3 w-3 rounded" style={{ backgroundColor: '#875cf5' }}></div>
+          <span>Regular</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="h-3 w-3 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
+          <span>Recurring</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="h-3 w-3 rounded" style={{ backgroundColor: '#a855f7' }}></div>
+          <span>Predicted</span>
+        </div>
+      </div>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
           <CartesianGrid stroke="none" />
@@ -85,7 +113,7 @@ const CustomBarChart: React.FC<CustomBarChartProps> = ({ data }) => {
 
           <Bar dataKey="amount" fill="#875cf5" radius={[10, 10, 0, 0]}>
             {data.map((entry, index) => (
-              <Cell key={index} fill={getBarColor(index)} />
+              <Cell key={index} fill={getBarColor(entry, index)} />
             ))}
           </Bar>
         </BarChart>

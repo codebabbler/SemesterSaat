@@ -18,6 +18,9 @@ interface TransactionInfoCardProps {
   type: "income" | "expense";
   hideDeleteBtn?: boolean;
   onDelete?: () => void;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
+  isVirtual?: boolean;
 }
 
 const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
@@ -28,6 +31,9 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
   type,
   hideDeleteBtn,
   onDelete,
+  isRecurring,
+  recurringPeriod,
+  isVirtual,
 }) => {
   const getAmountStyles = () =>
     type === "income" ? "bg-green-50 text-green-500" : "bg-red-50 text-red-500";
@@ -50,7 +56,19 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
 
       <div className="flex flex-1 items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-700">{title}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-700">{title}</p>
+            {isRecurring && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                Recurring {recurringPeriod}
+              </span>
+            )}
+            {isVirtual && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                Predicted
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-xs text-gray-400">{date}</p>
         </div>
 

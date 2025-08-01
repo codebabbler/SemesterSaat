@@ -9,6 +9,9 @@ interface Transaction {
   date: string;
   amount: number;
   source: string;
+  isRecurring?: boolean;
+  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
+  isVirtual?: boolean;
 }
 
 interface ChartData {
