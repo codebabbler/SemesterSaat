@@ -98,7 +98,6 @@ const Dashboard = () => {
     null,
   );
   const [loading, setLoading] = useState(false);
-  const [predictiveMode, setPredictiveMode] = useState(false);
 
   const fetchDashboardData = async () => {
     if (loading) return;
@@ -108,7 +107,7 @@ const Dashboard = () => {
     try {
       const response = await axiosInstance.get<{
         data: DashboardData;
-      }>(`${API_PATHS.DASHBOARD.GET_DATA}?predictive=${predictiveMode}`);
+      }>(`${API_PATHS.DASHBOARD.GET_DATA}`);
 
       if (response.data?.data) {
         setDashboardData(response.data.data);
@@ -122,7 +121,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     void fetchDashboardData();
-  }, [predictiveMode]);
+  }, []);
 
   useEffect(() => {
     console.log({ dashboardData });
@@ -148,21 +147,6 @@ const Dashboard = () => {
       <div className="mx-auto my-5">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Predictive Mode</span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={predictiveMode}
-                onChange={(e) => setPredictiveMode(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-            </label>
-            <span className="text-xs text-gray-500">
-              {predictiveMode ? "Including future recurring" : "Current only"}
-            </span>
-          </div>
         </div>
         
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">

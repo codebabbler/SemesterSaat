@@ -63,11 +63,11 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
                 Recurring {recurringPeriod}
               </span>
             )}
-            {isVirtual && (
+            {/* {isVirtual && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                 Predicted
               </span>
-            )}
+            )} */}
           </div>
           <p className="mt-1 text-xs text-gray-400">{date}</p>
         </div>

@@ -13,9 +13,10 @@ import {
 } from "../types/dashboard.types";
 import { Types } from "mongoose";
 
-// Helper function to generate recurring transactions for dashboard
-const generateRecurringTransactions = (transactions: any[], endDate: Date, type: 'income' | 'expense'): any[] => {
+// Helper function to generate recurring transactions for dashboard (up to today only)
+const generateRecurringTransactions = (transactions: any[], type: 'income' | 'expense'): any[] => {
   const recurringTransactions: any[] = [];
+  const today = new Date();
   
   transactions.forEach(transaction => {
     const { date, recurringPeriod, isRecurring } = transaction;
@@ -25,39 +26,21 @@ const generateRecurringTransactions = (transactions: any[], endDate: Date, type:
     }
     
     let currentDate = new Date(date);
-    const today = new Date();
     
-    // If the base date is in the past, start from the next occurrence after today
-    if (currentDate < today) {
-      while (currentDate < today) {
-        switch (recurringPeriod) {
-          case "daily":
-            currentDate.setDate(currentDate.getDate() + 1);
-            break;
-          case "weekly":
-            currentDate.setDate(currentDate.getDate() + 7);
-            break;
-          case "monthly":
-            currentDate.setMonth(currentDate.getMonth() + 1);
-            break;
-          case "yearly":
-            currentDate.setFullYear(currentDate.getFullYear() + 1);
-            break;
-        }
+    // Generate recurring entries up to today only
+    while (currentDate <= today) {
+      // Skip the original transaction date (it's already in the database)
+      if (currentDate.getTime() !== new Date(date).getTime()) {
+        const recurringTransaction = {
+          ...transaction.toObject(),
+          _id: `${transaction._id}_${currentDate.getTime()}`,
+          date: new Date(currentDate),
+          isVirtual: true,
+          originalId: transaction._id
+        };
+        
+        recurringTransactions.push(recurringTransaction);
       }
-    }
-    
-    // Generate recurring entries up to endDate
-    while (currentDate <= endDate) {
-      const recurringTransaction = {
-        ...transaction.toObject(),
-        _id: `${transaction._id}_${currentDate.getTime()}`,
-        date: new Date(currentDate),
-        isVirtual: true,
-        originalId: transaction._id
-      };
-      
-      recurringTransactions.push(recurringTransaction);
       
       // Move to next occurrence
       switch (recurringPeriod) {
@@ -87,12 +70,12 @@ const getDashboardData = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { period = 30, limit = 5, predictive = "false" } = req.query;
+    const { period = 30, limit = 5 } = req.query;
     const userId = new Types.ObjectId(req.user._id);
     
-    // Date filter for current vs predictive mode
+    // Date filter for current transactions (up to today)
     const currentDate = new Date();
-    const dateFilter = predictive === "true" ? {} : { date: { $lte: currentDate } };
+    const dateFilter = { date: { $lte: currentDate } };
 
     // Validate query parameters
     const periodDays = parseInt(period as string);
@@ -107,11 +90,7 @@ const getDashboardData = asyncHandler(
     }
 
     try {
-      // Get recurring transactions for predictive mode
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 3); // Show 3 months ahead
-      
-      // Get all income and expense transactions
+      // Get all income and expense transactions (including recurring)
       const [allIncome, allExpenses, recurringIncome, recurringExpenses] = await Promise.all([
         Income.find({ userId }),
         Expense.find({ userId }),
@@ -119,17 +98,17 @@ const getDashboardData = asyncHandler(
         Expense.find({ userId, isRecurring: true })
       ]);
       
-      // Generate recurring transactions for predictive mode
-      const futureIncomeTransactions = predictive === "true" ? generateRecurringTransactions(recurringIncome, endDate, 'income') : [];
-      const futureExpenseTransactions = predictive === "true" ? generateRecurringTransactions(recurringExpenses, endDate, 'expense') : [];
+      // Generate recurring transactions up to today
+      const generatedIncomeTransactions = generateRecurringTransactions(recurringIncome, 'income');
+      const generatedExpenseTransactions = generateRecurringTransactions(recurringExpenses, 'expense');
       
       // Combine all transactions
-      const allIncomeTransactions = predictive === "true" ? [...allIncome, ...futureIncomeTransactions] : allIncome;
-      const allExpenseTransactions = predictive === "true" ? [...allExpenses, ...futureExpenseTransactions] : allExpenses;
+      const allIncomeTransactions = [...allIncome, ...generatedIncomeTransactions];
+      const allExpenseTransactions = [...allExpenses, ...generatedExpenseTransactions];
       
-      // Apply date filters for non-predictive mode
-      const filteredIncomeTransactions = predictive === "true" ? allIncomeTransactions : allIncomeTransactions.filter(t => new Date(t.date) <= new Date());
-      const filteredExpenseTransactions = predictive === "true" ? allExpenseTransactions : allExpenseTransactions.filter(t => new Date(t.date) <= new Date());
+      // Filter transactions up to today
+      const filteredIncomeTransactions = allIncomeTransactions.filter(t => new Date(t.date) <= new Date());
+      const filteredExpenseTransactions = allExpenseTransactions.filter(t => new Date(t.date) <= new Date());
       
       // Parallel execution for better performance
       const [
@@ -358,14 +337,12 @@ const getDashboardData = asyncHandler(
       // Get last 30 and 60 days transaction details
       const last30DaysFilter = {
         userId,
-        date: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-        ...(predictive !== "true" && { date: { ...{ $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }, $lte: currentDate } })
+        date: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), $lte: currentDate }
       };
       
       const last60DaysFilter = {
         userId,
-        date: { $gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) },
-        ...(predictive !== "true" && { date: { ...{ $gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) }, $lte: currentDate } })
+        date: { $gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), $lte: currentDate }
       };
 
       const last30DaysIncomeTransactions = await Income.find(last30DaysFilter)
