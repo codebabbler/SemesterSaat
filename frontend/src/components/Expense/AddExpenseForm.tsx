@@ -73,14 +73,12 @@ const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAddExpense }) => {
       const result: PredictionResult = response.data.data;
       setPrediction(result);
 
-      // Auto-fill category if confidence is high
       if (result.isHighConfidence && result.category !== "Unknown") {
         handleChange("category", result.category);
         toast.success(
           `Category predicted: ${result.category} (${Math.round(result.confidence * 100)}% confidence)`,
         );
       } else {
-        // Show feedback option for low confidence predictions
         setShowFeedback(true);
         handleChange("category", result.category);
         toast(
@@ -131,6 +129,21 @@ const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAddExpense }) => {
 
   return (
     <div>
+      <Input
+        value={expense.amount}
+        onChange={({ target }) => handleChange("amount", target.value)}
+        label="Amount"
+        placeholder=""
+        type="number"
+      />
+
+      <DatePicker
+        value={expense.date}
+        onChange={(date) => handleChange("date", date)}
+        label="Date"
+        placeholder="Select expense date"
+      />
+
       <div>
         <label className="text-[13px] text-slate-800">Description</label>
         <div className="input-box">
@@ -198,21 +211,6 @@ const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAddExpense }) => {
           </button>
         </div>
       )}
-
-      <Input
-        value={expense.amount}
-        onChange={({ target }) => handleChange("amount", target.value)}
-        label="Amount"
-        placeholder=""
-        type="number"
-      />
-
-      <DatePicker
-        value={expense.date}
-        onChange={(date) => handleChange("date", date)}
-        label="Date"
-        placeholder="Select expense date"
-      />
 
       <div className="mt-4">
         <label className="flex items-center space-x-2">

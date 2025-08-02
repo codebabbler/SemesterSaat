@@ -17,7 +17,7 @@ const addExpense = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { icon, category, amount, date, isRecurring, recurringPeriod } = req.body;
+    const { icon, description, category, amount, date, isRecurring, recurringPeriod } = req.body;
 
     // Validation: Check for missing fields
     if (
@@ -71,6 +71,7 @@ const addExpense = asyncHandler(
     const newExpense = await Expense.create({
       userId: req.user._id,
       icon: icon || "",
+      description: description?.trim() || "",
       category: category.trim(),
       amount,
       date: parsedDate,
@@ -130,7 +131,6 @@ const generateRecurringExpenses = (baseExpense: any) => {
   return recurringExpenses;
 };
 
-// Get All Expenses (For Logged-in User)
 const getAllExpenses = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) {
@@ -233,16 +233,16 @@ const updateExpense = asyncHandler(
     }
 
     const { id } = req.params;
-    const { icon, category, amount, date, isRecurring, recurringPeriod } = req.body;
+    const { icon, description, category, amount, date, isRecurring, recurringPeriod } = req.body;
 
     if (!id) {
       throw new ApiErrors(400, "Expense ID is required");
     }
 
-    // Build update object with only provided fields
     const updateData: Partial<IExpense> = {};
     
     if (icon !== undefined) updateData.icon = icon;
+    if (description !== undefined) updateData.description = description?.trim() || "";
     if (category !== undefined) {
       if (!category.trim()) {
         throw new ApiErrors(400, "Category cannot be empty");
@@ -381,6 +381,7 @@ const downloadExpenseExcel = asyncHandler(
 
     // Prepare data for Excel
     const data = expenses.map((item) => ({
+      Description: item.description || "",
       Category: item.category,
       Amount: item.amount,
       Date: item.date.toISOString().split("T")[0], // Format date as YYYY-MM-DD

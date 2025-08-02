@@ -7,6 +7,7 @@ import { LuDownload } from "react-icons/lu";
 
 interface Transaction {
   _id: string;
+  description?: string;
   category: string;
   icon?: string;
   date: string;
@@ -42,7 +43,8 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
         {transactions?.map((expense) => (
           <TransactionInfoCard
             key={expense._id}
-            title={expense.category}
+            title={expense.description || expense.category}
+            badge={expense.category}
             icon={expense.icon}
             date={moment(expense.date).format("Do MMM YYYY")}
             amount={expense.amount}

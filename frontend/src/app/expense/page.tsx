@@ -29,6 +29,7 @@ interface ExpenseFormData {
   amount: string;
   date: string;
   icon: string;
+  description: string;
   isRecurring: boolean;
   recurringPeriod: "daily" | "weekly" | "monthly" | "yearly" | "";
 }
@@ -56,7 +57,7 @@ const Expense = () => {
 
     try {
       const response = await axiosInstance.get(
-        `${API_PATHS.EXPENSE.GET_ALL_EXPENSE}`
+        `${API_PATHS.EXPENSE.GET_ALL_EXPENSE}`,
       );
 
       if (response.data?.data?.expenses) {
@@ -71,7 +72,15 @@ const Expense = () => {
 
   // Handle Add Expense
   const handleAddExpense = async (expense: ExpenseFormData) => {
-    const { category, amount, date, icon, isRecurring, recurringPeriod } = expense;
+    const {
+      category,
+      amount,
+      date,
+      icon,
+      isRecurring,
+      recurringPeriod,
+      description,
+    } = expense;
 
     // Validation Checks
     if (!category.trim()) {
@@ -102,6 +111,7 @@ const Expense = () => {
         icon,
         isRecurring,
         recurringPeriod: isRecurring ? recurringPeriod : undefined,
+        description,
       });
 
       setOpenAddExpenseModal(false);
@@ -110,7 +120,7 @@ const Expense = () => {
     } catch (error: any) {
       console.error(
         "Error adding expense:",
-        error.response?.data?.message || error.message
+        error.response?.data?.message || error.message,
       );
       toast.error("Failed to add expense. Please try again.");
     }
@@ -127,7 +137,7 @@ const Expense = () => {
     } catch (error: any) {
       console.error(
         "Error deleting expense:",
-        error.response?.data?.message || error.message
+        error.response?.data?.message || error.message,
       );
       toast.error("Failed to delete expense. Please try again.");
     }
@@ -139,19 +149,19 @@ const Expense = () => {
       const response = await axiosInstance.get(
         API_PATHS.EXPENSE.DOWNLOAD_EXPENSE,
         {
-          responseType: "blob", 
-        }
+          responseType: "blob",
+        },
       );
 
       // Create a URL for the blob
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", "expense_details.xlsx"); 
+      link.setAttribute("download", "expense_details.xlsx");
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
-      window.URL.revokeObjectURL(url); 
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading expense details:", error);
       toast.error("Failed to download expense details. Please try again.");
@@ -164,12 +174,12 @@ const Expense = () => {
 
   return (
     <DashboardLayout activeMenu="Expense">
-      <div className="my-5 mx-auto">
+      <div className="mx-auto my-5">
         <div className="grid grid-cols-1 gap-6">
-          <div className="flex justify-between items-center mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-800">Expenses</h1>
           </div>
-          
+
           <div className="">
             <ExpenseOverview
               transactions={expenseData}
@@ -200,7 +210,9 @@ const Expense = () => {
           >
             <DeleteAlert
               content="Are you sure you want to delete this expense detail?"
-              onDelete={() => openDeleteAlert.data && deleteExpense(openDeleteAlert.data)}
+              onDelete={() =>
+                openDeleteAlert.data && deleteExpense(openDeleteAlert.data)
+              }
             />
           </Modal>
         </div>

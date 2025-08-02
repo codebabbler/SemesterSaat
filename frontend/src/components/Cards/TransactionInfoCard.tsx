@@ -13,6 +13,7 @@ import { formatCurrency } from "~/utils/constants";
 interface TransactionInfoCardProps {
   icon?: string;
   title: string;
+  badge?: string;
   date: string;
   amount: string | number;
   type: "income" | "expense";
@@ -26,6 +27,7 @@ interface TransactionInfoCardProps {
 const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
   icon,
   title,
+  badge,
   date,
   amount,
   type,
@@ -58,6 +60,11 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-gray-700">{title}</p>
+            {badge && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                {badge}
+              </span>
+            )}
             {isRecurring && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                 Recurring {recurringPeriod}
