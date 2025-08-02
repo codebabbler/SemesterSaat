@@ -6,25 +6,8 @@ import DatePicker from "~/components/Inputs/DatePicker";
 import { API_PATHS } from "~/utils/apiPaths";
 import toast from "react-hot-toast";
 import axiosInstance from "~/utils/axiosInstance";
+import type { IncomeData, PredictionResult } from "~/types/transaction.types";
 
-interface IncomeData {
-  _id: string;
-  description: string;
-  source: string;
-  amount: string;
-  date: string;
-  icon: string;
-  isRecurring: boolean;
-  recurringPeriod: "daily" | "weekly" | "monthly" | "yearly" | "";
-}
-
-interface PredictionResult {
-  source: string;
-  confidence: number;
-  isHighConfidence: boolean;
-  suggestFeedback: boolean;
-  mlServiceDown?: boolean;
-}
 
 interface EditIncomeFormProps {
   income: IncomeData;
@@ -68,12 +51,12 @@ const EditIncomeForm: React.FC<EditIncomeFormProps> = ({
 
       // Auto-fill source if confidence is high
       if (result.isHighConfidence && result.source !== 'Unknown') {
-        handleChange('source', result.source);
+        handleChange('source', result.source!);
         toast.success(`Source predicted: ${result.source} (${Math.round(result.confidence * 100)}% confidence)`);
       } else {
         // Show feedback option for low confidence predictions
         setShowFeedback(true);
-        handleChange('source', result.source);
+        handleChange('source', result.source!);
         toast(`Low confidence prediction: ${result.source}. Please verify or provide feedback.`, {
           icon: '⚠️',
           duration: 4000
@@ -88,7 +71,7 @@ const EditIncomeForm: React.FC<EditIncomeFormProps> = ({
   };
 
   const sendFeedback = async (correctSource: string) => {
-    if (!income.description.trim() || !correctSource.trim()) return;
+    if (!income.description?.trim() || !correctSource.trim()) return;
 
     try {
       await axiosInstance.post(API_PATHS.INCOME.FEEDBACK_SOURCE, {
@@ -108,7 +91,7 @@ const EditIncomeForm: React.FC<EditIncomeFormProps> = ({
   };
 
   const handleDescriptionBlur = () => {
-    if (income.description.trim() && income.description !== initialIncome.description) {
+    if (income.description?.trim() && income.description !== initialIncome.description) {
       predictSource(income.description);
     }
   };
@@ -182,7 +165,7 @@ const EditIncomeForm: React.FC<EditIncomeFormProps> = ({
       )}
 
       <Input
-        value={income.amount}
+        value={income.amount.toString()}
         onChange={({ target }) => handleChange("amount", target.value)}
         label="Amount"
         placeholder=""

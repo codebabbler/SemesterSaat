@@ -25,14 +25,14 @@ interface IncomeOverviewProps {
   onAddIncome: () => void;
 }
 
-const IncomeOverview: React.FC<IncomeOverviewProps> = ({ 
-  transactions, 
-  onAddIncome 
+const IncomeOverview: React.FC<IncomeOverviewProps> = ({
+  transactions,
+  onAddIncome,
 }) => {
   const [chartData, setChartData] = useState<ChartData[]>([]);
 
   useEffect(() => {
-    const result = prepareIncomeBarChartData(transactions);
+    const result = prepareIncomeBarChartData(transactions as any);
     setChartData(result);
   }, [transactions]);
 
@@ -41,7 +41,7 @@ const IncomeOverview: React.FC<IncomeOverviewProps> = ({
       <div className="flex items-center justify-between">
         <div className="">
           <h5 className="text-lg">Income Overview</h5>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="mt-0.5 text-xs text-gray-400">
             Track your earnings over time and analyze your income trends.
           </p>
         </div>

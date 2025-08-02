@@ -12,29 +12,8 @@ import EditIncomeForm from "~/components/Income/EditIncomeForm";
 import DeleteAlert from "~/components/DeleteAlert";
 import Modal from "~/components/Modal";
 import toast from "react-hot-toast";
+import type { IncomeData, IncomeFormData } from "~/types/transaction.types";
 
-interface IncomeData {
-  _id: string;
-  source: string;
-  description?: string;
-  amount: number;
-  date: string;
-  icon?: string;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-  originalId?: string;
-}
-
-interface IncomeFormData {
-  source: string;
-  description: string;
-  amount: string;
-  date: string;
-  icon: string;
-  isRecurring: boolean;
-  recurringPeriod: "daily" | "weekly" | "monthly" | "yearly" | "";
-}
 
 const Income = () => {
   useUserAuth();
@@ -142,7 +121,7 @@ const Income = () => {
     } = updatedIncome;
 
     // Validation Checks
-    if (!source.trim()) {
+    if (!(source as string)?.trim()) {
       toast.error("Source is required.");
       return;
     }
@@ -163,7 +142,7 @@ const Income = () => {
     }
 
     try {
-      await axiosInstance.put(API_PATHS.INCOME.UPDATE_INCOME(_id), {
+      await axiosInstance.put(API_PATHS.INCOME.UPDATE_INCOME(_id as string), {
         source,
         description,
         amount: Number(amount),

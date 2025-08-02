@@ -6,31 +6,17 @@ import DatePicker from "~/components/Inputs/DatePicker";
 import { API_PATHS } from "~/utils/apiPaths";
 import toast from "react-hot-toast";
 import axiosInstance from "~/utils/axiosInstance";
-
-interface IncomeData {
-  description: string;
-  source: string;
-  amount: string;
-  date: string;
-  icon: string;
-  isRecurring: boolean;
-  recurringPeriod: "daily" | "weekly" | "monthly" | "yearly" | "";
-}
-
-interface PredictionResult {
-  source: string;
-  confidence: number;
-  isHighConfidence: boolean;
-  suggestFeedback: boolean;
-  mlServiceDown?: boolean;
-}
+import type {
+  IncomeFormData,
+  PredictionResult,
+} from "~/types/transaction.types";
 
 interface AddIncomeFormProps {
-  onAddIncome: (income: IncomeData) => void;
+  onAddIncome: (income: IncomeFormData) => void;
 }
 
 const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
-  const [income, setIncome] = useState<IncomeData>({
+  const [income, setIncome] = useState<IncomeFormData>({
     description: "",
     source: "",
     amount: "",
@@ -45,11 +31,18 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
   const [showFeedback, setShowFeedback] = useState(false);
 
   const commonIncomeSources = [
-    'Salary', 'Freelance', 'Business', 'Investment', 'Rental', 
-    'Part-time', 'Commission', 'Bonus', 'Other'
+    "Salary",
+    "Freelance",
+    "Business",
+    "Investment",
+    "Rental",
+    "Part-time",
+    "Commission",
+    "Bonus",
+    "Other",
   ];
 
-  const handleChange = (key: keyof IncomeData, value: string | boolean) =>
+  const handleChange = (key: keyof IncomeFormData, value: string | boolean) =>
     setIncome({ ...income, [key]: value });
 
   const predictSource = async (description: string) => {
@@ -57,56 +50,68 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
 
     setIsPredicting(true);
     try {
-      const response = await axiosInstance.post(API_PATHS.INCOME.PREDICT_SOURCE, {
-        description: description.trim()
-      });
+      const response = await axiosInstance.post(
+        API_PATHS.INCOME.PREDICT_SOURCE,
+        {
+          description: description.trim(),
+        },
+      );
 
       const result: PredictionResult = response.data.data;
       setPrediction(result);
 
       // Auto-fill source if confidence is high
-      if (result.isHighConfidence && result.source !== 'Unknown') {
-        handleChange('source', result.source);
-        toast.success(`Source predicted: ${result.source} (${Math.round(result.confidence * 100)}% confidence)`);
+      if (result.isHighConfidence && result.source !== "Unknown") {
+        handleChange("source", result.source!);
+        toast.success(
+          `Source predicted: ${result.source} (${Math.round(result.confidence * 100)}% confidence)`,
+        );
       } else {
         // Show feedback option for low confidence predictions
         setShowFeedback(true);
-        handleChange('source', result.source);
-        toast(`Low confidence prediction: ${result.source}. Please verify or provide feedback.`, {
-          icon: '⚠️',
-          duration: 4000
-        });
+        handleChange("source", result.source!);
+        toast(
+          `Low confidence prediction: ${result.source}. Please verify or provide feedback.`,
+          {
+            icon: "⚠️",
+            duration: 4000,
+          },
+        );
       }
     } catch (error) {
-      console.error('Prediction error:', error);
-      toast.error('Could not predict source. Please select manually.');
+      console.error("Prediction error:", error);
+      toast.error("Could not predict source. Please select manually.");
     } finally {
       setIsPredicting(false);
     }
   };
 
   const sendFeedback = async (correctSource: string) => {
-    if (!income.description.trim() || !correctSource.trim()) return;
+    if (!income.description?.trim() || !correctSource.trim()) return;
 
     try {
       await axiosInstance.post(API_PATHS.INCOME.FEEDBACK_SOURCE, {
         description: income.description.trim(),
-        source: correctSource.trim()
+        source: correctSource.trim(),
       });
 
-      handleChange('source', correctSource);
+      handleChange("source", correctSource);
       setShowFeedback(false);
-      toast.success('Thank you for the feedback! This will help improve predictions.');
+      toast.success(
+        "Thank you for the feedback! This will help improve predictions.",
+      );
     } catch (error) {
-      console.error('Feedback error:', error);
-      toast.error('Could not send feedback, but your selection has been saved.');
-      handleChange('source', correctSource);
+      console.error("Feedback error:", error);
+      toast.error(
+        "Could not send feedback, but your selection has been saved.",
+      );
+      handleChange("source", correctSource);
       setShowFeedback(false);
     }
   };
 
   const handleDescriptionBlur = () => {
-    if (income.description.trim()) {
+    if (income.description?.trim()) {
       predictSource(income.description);
     }
   };
@@ -136,22 +141,24 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
           type="text"
         />
         {isPredicting && (
-          <div className="absolute right-3 top-9 flex items-center">
+          <div className="absolute top-9 right-3 flex items-center">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
             <span className="ml-2 text-xs text-gray-500">Predicting...</span>
           </div>
         )}
         {prediction && prediction.isHighConfidence && (
           <div className="mt-1 text-xs text-green-600">
-            ✓ Predicted with {Math.round(prediction.confidence * 100)}% confidence
+            ✓ Predicted with {Math.round(prediction.confidence * 100)}%
+            confidence
           </div>
         )}
       </div>
 
       {showFeedback && prediction && (
         <div className="mt-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
-          <p className="text-sm text-yellow-800 mb-2">
-            Is &quot;{prediction.source}&quot; correct? If not, please select the right source:
+          <p className="mb-2 text-sm text-yellow-800">
+            Is &quot;{prediction.source}&quot; correct? If not, please select
+            the right source:
           </p>
           <select
             className="w-full rounded border border-yellow-300 px-2 py-1 text-sm"

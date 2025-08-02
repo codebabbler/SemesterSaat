@@ -12,29 +12,7 @@ import EditExpenseForm from "~/components/Expense/EditExpenseForm";
 import DeleteAlert from "~/components/DeleteAlert";
 import Modal from "~/components/Modal";
 import toast from "react-hot-toast";
-
-interface ExpenseData {
-  _id: string;
-  category: string;
-  description?: string;
-  amount: number;
-  date: string;
-  icon?: string;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-  originalId?: string;
-}
-
-interface ExpenseFormData {
-  category: string;
-  amount: string;
-  date: string;
-  icon: string;
-  description: string;
-  isRecurring: boolean;
-  recurringPeriod: "daily" | "weekly" | "monthly" | "yearly" | "";
-}
+import type { ExpenseData, ExpenseFormData } from "~/types/transaction.types";
 
 const Expense = () => {
   useUserAuth();
@@ -152,7 +130,7 @@ const Expense = () => {
     } = updatedExpense;
 
     // Validation Checks
-    if (!category.trim()) {
+    if (!(category as string)?.trim()) {
       toast.error("Category is required.");
       return;
     }
@@ -173,7 +151,7 @@ const Expense = () => {
     }
 
     try {
-      await axiosInstance.put(API_PATHS.EXPENSE.UPDATE_EXPENSE(_id), {
+      await axiosInstance.put(API_PATHS.EXPENSE.UPDATE_EXPENSE(_id as string), {
         category,
         amount: Number(amount),
         date,

@@ -1,4 +1,9 @@
 import moment from "moment";
+import type {
+  ExpenseData,
+  IncomeData,
+  ExpenseLineData,
+} from "~/types/transaction.types";
 
 export const validateEmail = (email: string): boolean => {
   const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,33 +39,12 @@ export const addThousandsSeparator = (num: number | string): string => {
     : formattedInteger;
 };
 
-interface ExpenseData {
-  category: string;
-  amount: number;
-  date: string;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-}
-
-interface IncomeData {
-  date: string;
-  amount: number;
-  source: string;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-}
-
-interface ExpenseLineData {
-  date: string;
-  amount: number;
-  category: string;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-}
-
 export const prepareExpenseBarChartData = (data: ExpenseData[] = []) => {
   // Group expenses by date and sum amounts
-  const dateTotals: Record<string, { amount: number; hasRecurring: boolean; hasVirtual: boolean }> = {};
+  const dateTotals: Record<
+    string,
+    { amount: number; hasRecurring: boolean; hasVirtual: boolean }
+  > = {};
 
   data.forEach((item) => {
     const date = moment(item?.date).format("Do MMM");
@@ -70,13 +54,14 @@ export const prepareExpenseBarChartData = (data: ExpenseData[] = []) => {
 
     if (dateTotals[date]) {
       dateTotals[date].amount += amount;
-      dateTotals[date].hasRecurring = dateTotals[date].hasRecurring || isRecurring;
+      dateTotals[date].hasRecurring =
+        dateTotals[date].hasRecurring || isRecurring;
       dateTotals[date].hasVirtual = dateTotals[date].hasVirtual || isVirtual;
     } else {
       dateTotals[date] = {
         amount,
         hasRecurring: isRecurring,
-        hasVirtual: isVirtual
+        hasVirtual: isVirtual,
       };
     }
   });
@@ -86,7 +71,7 @@ export const prepareExpenseBarChartData = (data: ExpenseData[] = []) => {
     month: date, // Using 'month' key for consistency with chart component
     amount: info.amount,
     hasRecurring: info.hasRecurring,
-    hasVirtual: info.hasVirtual
+    hasVirtual: info.hasVirtual,
   }));
 
   // Sort by date to show latest to the right
@@ -99,12 +84,20 @@ export const prepareExpenseBarChartData = (data: ExpenseData[] = []) => {
 
 export const prepareIncomeBarChartData = (data: IncomeData[] = []) => {
   // Group income by date and sum amounts
-  const dateTotals: Record<string, { amount: number; sources: string[]; hasRecurring: boolean; hasVirtual: boolean }> = {};
+  const dateTotals: Record<
+    string,
+    {
+      amount: number;
+      sources: string[];
+      hasRecurring: boolean;
+      hasVirtual: boolean;
+    }
+  > = {};
 
   data.forEach((item) => {
     const date = moment(item?.date).format("Do MMM");
     const amount = item?.amount ?? 0;
-    const source = item?.source ?? 'Unknown';
+    const source = item?.source ?? "Unknown";
     const isRecurring = item?.isRecurring ?? false;
     const isVirtual = (item as { isVirtual?: boolean })?.isVirtual ?? false;
 
@@ -113,14 +106,15 @@ export const prepareIncomeBarChartData = (data: IncomeData[] = []) => {
       if (!dateTotals[date].sources.includes(source)) {
         dateTotals[date].sources.push(source);
       }
-      dateTotals[date].hasRecurring = dateTotals[date].hasRecurring || isRecurring;
+      dateTotals[date].hasRecurring =
+        dateTotals[date].hasRecurring || isRecurring;
       dateTotals[date].hasVirtual = dateTotals[date].hasVirtual || isVirtual;
     } else {
       dateTotals[date] = {
         amount,
         sources: [source],
         hasRecurring: isRecurring,
-        hasVirtual: isVirtual
+        hasVirtual: isVirtual,
       };
     }
   });
@@ -129,9 +123,9 @@ export const prepareIncomeBarChartData = (data: IncomeData[] = []) => {
   const chartData = Object.entries(dateTotals).map(([date, info]) => ({
     month: date,
     amount: info.amount,
-    source: info.sources.join(', '),
+    source: info.sources.join(", "),
     hasRecurring: info.hasRecurring,
-    hasVirtual: info.hasVirtual
+    hasVirtual: info.hasVirtual,
   }));
 
   // Sort by date
@@ -144,12 +138,20 @@ export const prepareIncomeBarChartData = (data: IncomeData[] = []) => {
 
 export const prepareExpenseLineChartData = (data: ExpenseLineData[] = []) => {
   // Group expenses by date and sum amounts
-  const dateTotals: Record<string, { amount: number; categories: string[]; hasRecurring: boolean; hasVirtual: boolean }> = {};
+  const dateTotals: Record<
+    string,
+    {
+      amount: number;
+      categories: string[];
+      hasRecurring: boolean;
+      hasVirtual: boolean;
+    }
+  > = {};
 
   data.forEach((item) => {
     const date = moment(item?.date).format("Do MMM");
     const amount = item?.amount ?? 0;
-    const category = item?.category ?? 'Unknown';
+    const category = item?.category ?? "Unknown";
     const isRecurring = item?.isRecurring ?? false;
     const isVirtual = (item as { isVirtual?: boolean })?.isVirtual ?? false;
 
@@ -158,14 +160,15 @@ export const prepareExpenseLineChartData = (data: ExpenseLineData[] = []) => {
       if (!dateTotals[date].categories.includes(category)) {
         dateTotals[date].categories.push(category);
       }
-      dateTotals[date].hasRecurring = dateTotals[date].hasRecurring || isRecurring;
+      dateTotals[date].hasRecurring =
+        dateTotals[date].hasRecurring || isRecurring;
       dateTotals[date].hasVirtual = dateTotals[date].hasVirtual || isVirtual;
     } else {
       dateTotals[date] = {
         amount,
         categories: [category],
         hasRecurring: isRecurring,
-        hasVirtual: isVirtual
+        hasVirtual: isVirtual,
       };
     }
   });
@@ -174,9 +177,9 @@ export const prepareExpenseLineChartData = (data: ExpenseLineData[] = []) => {
   const chartData = Object.entries(dateTotals).map(([date, info]) => ({
     month: date,
     amount: info.amount,
-    category: info.categories.join(', '),
+    category: info.categories.join(", "),
     hasRecurring: info.hasRecurring,
-    hasVirtual: info.hasVirtual
+    hasVirtual: info.hasVirtual,
   }));
 
   // Sort by date

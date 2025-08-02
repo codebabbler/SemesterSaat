@@ -6,25 +6,7 @@ import DatePicker from "~/components/Inputs/DatePicker";
 import { API_PATHS } from "~/utils/apiPaths";
 import toast from "react-hot-toast";
 import axiosInstance from "~/utils/axiosInstance";
-
-interface ExpenseData {
-  _id: string;
-  description: string;
-  category: string;
-  amount: string;
-  date: string;
-  icon: string;
-  isRecurring: boolean;
-  recurringPeriod: "daily" | "weekly" | "monthly" | "yearly" | "";
-}
-
-interface PredictionResult {
-  category: string;
-  confidence: number;
-  isHighConfidence: boolean;
-  suggestFeedback: boolean;
-  mlServiceDown?: boolean;
-}
+import type { ExpenseData, PredictionResult } from "~/types/transaction.types";
 
 interface EditExpenseFormProps {
   expense: ExpenseData;
@@ -32,10 +14,10 @@ interface EditExpenseFormProps {
   onCancel: () => void;
 }
 
-const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ 
-  expense: initialExpense, 
-  onUpdateExpense, 
-  onCancel 
+const EditExpenseForm: React.FC<EditExpenseFormProps> = ({
+  expense: initialExpense,
+  onUpdateExpense,
+  onCancel,
 }) => {
   const [expense, setExpense] = useState<ExpenseData>(initialExpense);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
@@ -77,13 +59,13 @@ const EditExpenseForm: React.FC<EditExpenseFormProps> = ({
       setPrediction(result);
 
       if (result.isHighConfidence && result.category !== "Unknown") {
-        handleChange("category", result.category);
+        handleChange("category", result.category!);
         toast.success(
           `Category predicted: ${result.category} (${Math.round(result.confidence * 100)}% confidence)`,
         );
       } else {
         setShowFeedback(true);
-        handleChange("category", result.category);
+        handleChange("category", result.category!);
         toast(
           `Low confidence prediction: ${result.category}. Please verify or provide feedback.`,
           {
@@ -101,7 +83,7 @@ const EditExpenseForm: React.FC<EditExpenseFormProps> = ({
   };
 
   const sendFeedback = async (correctCategory: string) => {
-    if (!expense.description.trim() || !correctCategory.trim()) return;
+    if (!expense.description?.trim() || !correctCategory.trim()) return;
 
     try {
       await axiosInstance.post(API_PATHS.EXPENSE.FEEDBACK_CATEGORY, {
@@ -125,7 +107,10 @@ const EditExpenseForm: React.FC<EditExpenseFormProps> = ({
   };
 
   const handleDescriptionBlur = () => {
-    if (expense.description.trim() && expense.description !== initialExpense.description) {
+    if (
+      expense.description?.trim() &&
+      expense.description !== initialExpense.description
+    ) {
       predictCategory(expense.description);
     }
   };
@@ -133,7 +118,7 @@ const EditExpenseForm: React.FC<EditExpenseFormProps> = ({
   return (
     <div>
       <Input
-        value={expense.amount}
+        value={expense.amount.toString()}
         onChange={({ target }) => handleChange("amount", target.value)}
         label="Amount"
         placeholder=""
