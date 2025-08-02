@@ -8,6 +8,7 @@ import { API_PATHS } from "~/utils/apiPaths";
 import ExpenseOverview from "~/components/Expense/ExpenseOverview";
 import ExpenseList from "~/components/Expense/ExpenseList";
 import AddExpenseForm from "~/components/Expense/AddExpenseForm";
+import EditExpenseForm from "~/components/Expense/EditExpenseForm";
 import DeleteAlert from "~/components/DeleteAlert";
 import Modal from "~/components/Modal";
 import toast from "react-hot-toast";
@@ -15,6 +16,7 @@ import toast from "react-hot-toast";
 interface ExpenseData {
   _id: string;
   category: string;
+  description?: string;
   amount: number;
   date: string;
   icon?: string;
@@ -41,6 +43,10 @@ const Expense = () => {
   const [loading, setLoading] = useState(false);
 
   const [openAddExpenseModal, setOpenAddExpenseModal] = useState(false);
+  const [openEditExpenseModal, setOpenEditExpenseModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<ExpenseData | null>(
+    null,
+  );
   const [openDeleteAlert, setOpenDeleteAlert] = useState<{
     show: boolean;
     data: string | null;
@@ -126,6 +132,85 @@ const Expense = () => {
     }
   };
 
+  // Handle Edit Expense
+  const handleEditExpense = (expense: ExpenseData) => {
+    setEditingExpense(expense);
+    setOpenEditExpenseModal(true);
+  };
+
+  // Handle Update Expense
+  const handleUpdateExpense = async (updatedExpense: any) => {
+    const {
+      _id,
+      category,
+      amount,
+      date,
+      icon,
+      isRecurring,
+      recurringPeriod,
+      description,
+    } = updatedExpense;
+
+    // Validation Checks
+    if (!category.trim()) {
+      toast.error("Category is required.");
+      return;
+    }
+
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      toast.error("Amount should be a valid number greater than 0.");
+      return;
+    }
+
+    if (!date) {
+      toast.error("Date is required.");
+      return;
+    }
+
+    if (isRecurring && !recurringPeriod) {
+      toast.error("Recurring period is required for recurring expenses.");
+      return;
+    }
+
+    try {
+      await axiosInstance.put(API_PATHS.EXPENSE.UPDATE_EXPENSE(_id), {
+        category,
+        amount: Number(amount),
+        date,
+        icon,
+        isRecurring,
+        recurringPeriod: isRecurring ? recurringPeriod : undefined,
+        description,
+      });
+
+      setOpenEditExpenseModal(false);
+      setEditingExpense(null);
+      toast.success("Expense updated successfully");
+      fetchExpenseDetails();
+    } catch (error: any) {
+      console.error(
+        "Error updating expense:",
+        error.response?.data?.message || error.message,
+      );
+      toast.error("Failed to update expense. Please try again.");
+    }
+  };
+
+  // Handle Toggle Recurring
+  const handleToggleRecurring = async (id: string) => {
+    try {
+      await axiosInstance.patch(API_PATHS.EXPENSE.TOGGLE_RECURRING_EXPENSE(id));
+      toast.success("Recurring status updated successfully");
+      fetchExpenseDetails();
+    } catch (error: any) {
+      console.error(
+        "Error toggling recurring:",
+        error.response?.data?.message || error.message,
+      );
+      toast.error("Failed to update recurring status. Please try again.");
+    }
+  };
+
   // Delete Expense
   const deleteExpense = async (id: string) => {
     try {
@@ -192,6 +277,8 @@ const Expense = () => {
             onDelete={(id) => {
               setOpenDeleteAlert({ show: true, data: id });
             }}
+            onEdit={handleEditExpense}
+            onToggleRecurring={handleToggleRecurring}
             onDownload={handleDownloadExpenseDetails}
           />
 
@@ -201,6 +288,26 @@ const Expense = () => {
             title="Add Expense"
           >
             <AddExpenseForm onAddExpense={handleAddExpense} />
+          </Modal>
+
+          <Modal
+            isOpen={openEditExpenseModal}
+            onClose={() => {
+              setOpenEditExpenseModal(false);
+              setEditingExpense(null);
+            }}
+            title="Edit Expense"
+          >
+            {editingExpense && (
+              <EditExpenseForm
+                expense={editingExpense}
+                onUpdateExpense={handleUpdateExpense}
+                onCancel={() => {
+                  setOpenEditExpenseModal(false);
+                  setEditingExpense(null);
+                }}
+              />
+            )}
           </Modal>
 
           <Modal

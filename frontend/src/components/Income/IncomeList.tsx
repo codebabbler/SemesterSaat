@@ -7,6 +7,7 @@ import { LuDownload } from "react-icons/lu";
 
 interface Transaction {
   _id: string;
+  description?: string;
   source: string;
   icon?: string;
   date: string;
@@ -20,12 +21,16 @@ interface Transaction {
 interface IncomeListProps {
   transactions: Transaction[];
   onDelete: (id: string) => void;
+  onEdit: (transaction: Transaction) => void;
+  onToggleRecurring: (id: string) => void;
   onDownload: () => void;
 }
 
 const IncomeList: React.FC<IncomeListProps> = ({ 
   transactions, 
   onDelete, 
+  onEdit,
+  onToggleRecurring,
   onDownload 
 }) => {
   return (
@@ -42,12 +47,15 @@ const IncomeList: React.FC<IncomeListProps> = ({
         {transactions?.map((income) => (
           <TransactionInfoCard
             key={income._id}
-            title={income.source}
+            title={income.description || income.source}
+            badge={income.source}
             icon={income.icon}
             date={moment(income.date).format("Do MMM YYYY")}
             amount={income.amount}
             type="income"
             onDelete={() => onDelete(income.originalId ?? income._id)}
+            onEdit={() => onEdit(income)}
+            onToggleRecurring={() => onToggleRecurring(income.originalId ?? income._id)}
             isRecurring={income.isRecurring}
             recurringPeriod={income.recurringPeriod}
             isVirtual={income.isVirtual}

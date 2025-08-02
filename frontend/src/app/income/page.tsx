@@ -8,6 +8,7 @@ import { API_PATHS } from "~/utils/apiPaths";
 import IncomeOverview from "~/components/Income/IncomeOverview";
 import IncomeList from "~/components/Income/IncomeList";
 import AddIncomeForm from "~/components/Income/AddIncomeForm";
+import EditIncomeForm from "~/components/Income/EditIncomeForm";
 import DeleteAlert from "~/components/DeleteAlert";
 import Modal from "~/components/Modal";
 import toast from "react-hot-toast";
@@ -15,6 +16,7 @@ import toast from "react-hot-toast";
 interface IncomeData {
   _id: string;
   source: string;
+  description?: string;
   amount: number;
   date: string;
   icon?: string;
@@ -26,6 +28,7 @@ interface IncomeData {
 
 interface IncomeFormData {
   source: string;
+  description: string;
   amount: string;
   date: string;
   icon: string;
@@ -40,6 +43,8 @@ const Income = () => {
   const [loading, setLoading] = useState(false);
 
   const [openAddIncomeModal, setOpenAddIncomeModal] = useState(false);
+  const [openEditIncomeModal, setOpenEditIncomeModal] = useState(false);
+  const [editingIncome, setEditingIncome] = useState<IncomeData | null>(null);
   const [openDeleteAlert, setOpenDeleteAlert] = useState<{
     show: boolean;
     data: string | null;
@@ -71,7 +76,7 @@ const Income = () => {
 
   // Handle Add Income
   const handleAddIncome = async (income: IncomeFormData) => {
-    const { source, amount, date, icon, isRecurring, recurringPeriod } = income;
+    const { source, description, amount, date, icon, isRecurring, recurringPeriod } = income;
 
     // Validation Checks
     if (!source.trim()) {
@@ -97,6 +102,7 @@ const Income = () => {
     try {
       await axiosInstance.post(API_PATHS.INCOME.ADD_INCOME, {
         source,
+        description,
         amount: Number(amount),
         date,
         icon,
@@ -113,6 +119,85 @@ const Income = () => {
         error.response?.data?.message || error.message
       );
       toast.error("Failed to add income. Please try again.");
+    }
+  };
+
+  // Handle Edit Income
+  const handleEditIncome = (income: IncomeData) => {
+    setEditingIncome(income);
+    setOpenEditIncomeModal(true);
+  };
+
+  // Handle Update Income
+  const handleUpdateIncome = async (updatedIncome: any) => {
+    const {
+      _id,
+      source,
+      description,
+      amount,
+      date,
+      icon,
+      isRecurring,
+      recurringPeriod,
+    } = updatedIncome;
+
+    // Validation Checks
+    if (!source.trim()) {
+      toast.error("Source is required.");
+      return;
+    }
+
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      toast.error("Amount should be a valid number greater than 0.");
+      return;
+    }
+
+    if (!date) {
+      toast.error("Date is required.");
+      return;
+    }
+
+    if (isRecurring && !recurringPeriod) {
+      toast.error("Recurring period is required for recurring income.");
+      return;
+    }
+
+    try {
+      await axiosInstance.put(API_PATHS.INCOME.UPDATE_INCOME(_id), {
+        source,
+        description,
+        amount: Number(amount),
+        date,
+        icon,
+        isRecurring,
+        recurringPeriod: isRecurring ? recurringPeriod : undefined,
+      });
+
+      setOpenEditIncomeModal(false);
+      setEditingIncome(null);
+      toast.success("Income updated successfully");
+      fetchIncomeDetails();
+    } catch (error: any) {
+      console.error(
+        "Error updating income:",
+        error.response?.data?.message || error.message,
+      );
+      toast.error("Failed to update income. Please try again.");
+    }
+  };
+
+  // Handle Toggle Recurring
+  const handleToggleRecurring = async (id: string) => {
+    try {
+      await axiosInstance.patch(API_PATHS.INCOME.TOGGLE_RECURRING_INCOME(id));
+      toast.success("Recurring status updated successfully");
+      fetchIncomeDetails();
+    } catch (error: any) {
+      console.error(
+        "Error toggling recurring:",
+        error.response?.data?.message || error.message,
+      );
+      toast.error("Failed to update recurring status. Please try again.");
     }
   };
 
@@ -182,6 +267,8 @@ const Income = () => {
             onDelete={(id) => {
               setOpenDeleteAlert({ show: true, data: id });
             }}
+            onEdit={handleEditIncome}
+            onToggleRecurring={handleToggleRecurring}
             onDownload={handleDownloadIncomeDetails}
           />
 
@@ -191,6 +278,26 @@ const Income = () => {
             title="Add Income"
           >
             <AddIncomeForm onAddIncome={handleAddIncome} />
+          </Modal>
+
+          <Modal
+            isOpen={openEditIncomeModal}
+            onClose={() => {
+              setOpenEditIncomeModal(false);
+              setEditingIncome(null);
+            }}
+            title="Edit Income"
+          >
+            {editingIncome && (
+              <EditIncomeForm
+                income={editingIncome}
+                onUpdateIncome={handleUpdateIncome}
+                onCancel={() => {
+                  setOpenEditIncomeModal(false);
+                  setEditingIncome(null);
+                }}
+              />
+            )}
           </Modal>
 
           <Modal

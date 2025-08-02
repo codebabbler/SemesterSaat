@@ -21,12 +21,16 @@ interface Transaction {
 interface ExpenseListProps {
   transactions: Transaction[];
   onDelete: (id: string) => void;
+  onEdit: (transaction: Transaction) => void;
+  onToggleRecurring: (id: string) => void;
   onDownload: () => void;
 }
 
 const ExpenseList: React.FC<ExpenseListProps> = ({ 
   transactions, 
   onDelete, 
+  onEdit,
+  onToggleRecurring,
   onDownload 
 }) => {
   return (
@@ -50,6 +54,8 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
             amount={expense.amount}
             type="expense"
             onDelete={() => onDelete(expense.originalId ?? expense._id)}
+            onEdit={() => onEdit(expense)}
+            onToggleRecurring={() => onToggleRecurring(expense.originalId ?? expense._id)}
             isRecurring={expense.isRecurring}
             recurringPeriod={expense.recurringPeriod}
             isVirtual={expense.isVirtual}

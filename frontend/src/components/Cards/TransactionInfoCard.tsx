@@ -7,6 +7,9 @@ import {
   LuTrendingUp,
   LuTrendingDown,
   LuTrash2,
+  LuPencil,
+  LuRepeat,
+  LuSquare,
 } from "react-icons/lu";
 import { formatCurrency } from "~/utils/constants";
 
@@ -19,6 +22,8 @@ interface TransactionInfoCardProps {
   type: "income" | "expense";
   hideDeleteBtn?: boolean;
   onDelete?: () => void;
+  onEdit?: () => void;
+  onToggleRecurring?: () => void;
   isRecurring?: boolean;
   recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
   isVirtual?: boolean;
@@ -33,6 +38,8 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
   type,
   hideDeleteBtn,
   onDelete,
+  onEdit,
+  onToggleRecurring,
   isRecurring,
   recurringPeriod,
   isVirtual,
@@ -56,47 +63,53 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
         )}
       </div>
 
-      <div className="flex flex-1 items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
+      <div className="flex flex-1 flex-col justify-between">
+        <div className="flex items-center justify-between">
+          <div>
             <p className="text-sm font-medium text-gray-700">{title}</p>
-            {badge && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                {badge}
-              </span>
-            )}
-            {isRecurring && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                Recurring {recurringPeriod}
-              </span>
-            )}
-            {/* {isVirtual && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                Predicted
-              </span>
-            )} */}
+            <p className="mt-1 text-xs text-gray-400">{date}</p>
           </div>
-          <p className="mt-1 text-xs text-gray-400">{date}</p>
-        </div>
+          <div className="flex items-center gap-2">
+            {onEdit && !isVirtual && (
+              <button
+                className="cursor-pointer text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-blue-500"
+                onClick={onEdit}
+                title="Edit transaction"
+              >
+                <LuPencil size={18} />
+              </button>
+            )}
+            {!hideDeleteBtn && (
+              <button
+                className="cursor-pointer text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
+                onClick={onDelete}
+                title="Delete transaction"
+              >
+                <LuTrash2 size={18} />
+              </button>
+            )}
 
-        <div className="flex items-center gap-2">
-          {!hideDeleteBtn && (
-            <button
-              className="cursor-pointer text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
-              onClick={onDelete}
+            <div
+              className={`flex items-center gap-2 rounded-md px-3 py-1.5 ${getAmountStyles()}`}
             >
-              <LuTrash2 size={18} />
-            </button>
-          )}
-
-          <div
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 ${getAmountStyles()}`}
-          >
-            <h6 className="text-xs font-medium">
-              {type === "income" ? "+" : "-"} {formatCurrency(amount)}
-            </h6>
-            {type === "income" ? <LuTrendingUp /> : <LuTrendingDown />}
+              <h6 className="text-xs font-medium">
+                {type === "income" ? "+" : "-"} {formatCurrency(amount)}
+              </h6>
+              {type === "income" ? <LuTrendingUp /> : <LuTrendingDown />}
+            </div>
           </div>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          {badge && (
+            <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+              {badge}
+            </span>
+          )}
+          {isRecurring && (
+            <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+              Recurring {recurringPeriod}
+            </span>
+          )}
         </div>
       </div>
     </div>
