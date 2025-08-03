@@ -379,14 +379,37 @@ const downloadExpenseExcel = asyncHandler(
       throw new ApiErrors(404, "No expense records found");
     }
 
+    let allExpenses = [...expenses];
+    
+    // Generate recurring expenses up to today (same logic as getAllExpenses)
+    const recurringExpenses = await Expense.find({
+      userId: req.user._id,
+      isRecurring: true
+    });
+    
+    recurringExpenses.forEach(expense => {
+      const generated = generateRecurringExpenses(expense);
+      allExpenses.push(...generated);
+    });
+    
+    // Filter out future dates and sort all expenses
+    allExpenses = allExpenses.filter(expense => new Date(expense.date) <= new Date());
+    allExpenses.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA; // Most recent first
+    });
+
     // Prepare data for Excel
-    const data = expenses.map((item) => ({
+    const data = allExpenses.map((item) => ({
       Description: item.description || "",
       Category: item.category,
       Amount: item.amount,
       Date: item.date.toISOString().split("T")[0], // Format date as YYYY-MM-DD
-      Icon: item.icon || "",
-      "Created At": item.createdAt.toISOString().split("T")[0],
+      "Is Recurring": item.isRecurring ? "Yes" : "No",
+      "Recurring Period": item.recurringPeriod || "",
+      "Type": item.isVirtual ? "Recurring Instance" : "Original",
+      "Created At": item.createdAt ? item.createdAt.toISOString().split("T")[0] : "",
     }));
 
     // Create workbook and worksheet

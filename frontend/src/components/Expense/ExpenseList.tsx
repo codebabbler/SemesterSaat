@@ -4,24 +4,12 @@ import React from "react";
 import TransactionInfoCard from "~/components/Cards/TransactionInfoCard";
 import moment from "moment";
 import { LuDownload } from "react-icons/lu";
-
-interface Transaction {
-  _id: string;
-  description?: string;
-  category: string;
-  icon?: string;
-  date: string;
-  amount: number;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-  originalId?: string;
-}
+import type { ExpenseData } from "~/types/transaction.types";
 
 interface ExpenseListProps {
-  transactions: Transaction[];
+  transactions: ExpenseData[];
   onDelete: (id: string) => void;
-  onEdit: (transaction: Transaction) => void;
+  onEdit: (transaction: ExpenseData) => void;
   onToggleRecurring: (id: string) => void;
   onDownload: () => void;
 }

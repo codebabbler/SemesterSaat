@@ -4,15 +4,7 @@ import React, { useEffect, useState } from "react";
 import { LuPlus } from "react-icons/lu";
 import CustomBarChart from "~/components/Charts/CustomBarChart";
 import { prepareIncomeBarChartData } from "~/utils/helper";
-
-interface Transaction {
-  date: string;
-  amount: number;
-  source: string;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-}
+import type { IncomeData } from "~/types/transaction.types";
 
 interface ChartData {
   month: string;
@@ -21,7 +13,7 @@ interface ChartData {
 }
 
 interface IncomeOverviewProps {
-  transactions: Transaction[];
+  transactions: IncomeData[];
   onAddIncome: () => void;
 }
 

@@ -10,8 +10,10 @@ import {
   LuPencil,
   LuRepeat,
   LuSquare,
+  LuDollarSign,
 } from "react-icons/lu";
 import { formatCurrency } from "~/utils/constants";
+import type { RecurringPeriod } from "~/types/transaction.types";
 
 interface TransactionInfoCardProps {
   icon?: string;
@@ -25,7 +27,7 @@ interface TransactionInfoCardProps {
   onEdit?: () => void;
   onToggleRecurring?: () => void;
   isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
+  recurringPeriod?: RecurringPeriod;
   isVirtual?: boolean;
 }
 
@@ -49,18 +51,8 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
 
   return (
     <div className="group relative mt-2 flex items-center gap-4 rounded-lg p-3 hover:bg-gray-100/60">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-800">
-        {icon ? (
-          <Image
-            src={icon}
-            alt={title}
-            width={24}
-            height={24}
-            className="h-6 w-6"
-          />
-        ) : (
-          <LuUtensils />
-        )}
+      <div className={`flex h-12 w-12 items-center justify-center rounded-full text-xl ${type === "income" ? "bg-green-50" : "bg-red-50"}`}>
+        <LuDollarSign className={type === "income" ? "text-green-600" : "text-red-600"} />
       </div>
 
       <div className="flex flex-1 flex-col justify-between">
