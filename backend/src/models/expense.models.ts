@@ -5,6 +5,7 @@ interface IExpense extends Document {
   _id: string;
   userId: string;
   icon?: string;
+  description?: string;
   category: string;
   amount: number;
   date: Date;
@@ -23,6 +24,9 @@ const expenseSchema = new Schema(
       required: true,
     },
     icon: {
+      type: String,
+    },
+    description: {
       type: String,
     },
     category: {

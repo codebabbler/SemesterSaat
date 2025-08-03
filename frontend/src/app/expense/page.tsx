@@ -8,39 +8,23 @@ import { API_PATHS } from "~/utils/apiPaths";
 import ExpenseOverview from "~/components/Expense/ExpenseOverview";
 import ExpenseList from "~/components/Expense/ExpenseList";
 import AddExpenseForm from "~/components/Expense/AddExpenseForm";
+import EditExpenseForm from "~/components/Expense/EditExpenseForm";
 import DeleteAlert from "~/components/DeleteAlert";
 import Modal from "~/components/Modal";
 import toast from "react-hot-toast";
-
-interface ExpenseData {
-  _id: string;
-  category: string;
-  amount: number;
-  date: string;
-  icon?: string;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-  originalId?: string;
-}
-
-interface ExpenseFormData {
-  category: string;
-  amount: string;
-  date: string;
-  icon: string;
-  isRecurring: boolean;
-  recurringPeriod: "daily" | "weekly" | "monthly" | "yearly" | "";
-}
+import type { ExpenseData, ExpenseFormData } from "~/types/transaction.types";
 
 const Expense = () => {
   useUserAuth();
 
   const [expenseData, setExpenseData] = useState<ExpenseData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [predictiveMode, setPredictiveMode] = useState(false);
 
   const [openAddExpenseModal, setOpenAddExpenseModal] = useState(false);
+  const [openEditExpenseModal, setOpenEditExpenseModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<ExpenseData | null>(
+    null,
+  );
   const [openDeleteAlert, setOpenDeleteAlert] = useState<{
     show: boolean;
     data: string | null;
@@ -57,7 +41,7 @@ const Expense = () => {
 
     try {
       const response = await axiosInstance.get(
-        `${API_PATHS.EXPENSE.GET_ALL_EXPENSE}?predictive=${predictiveMode}`
+        `${API_PATHS.EXPENSE.GET_ALL_EXPENSE}`,
       );
 
       if (response.data?.data?.expenses) {
@@ -72,7 +56,15 @@ const Expense = () => {
 
   // Handle Add Expense
   const handleAddExpense = async (expense: ExpenseFormData) => {
-    const { category, amount, date, icon, isRecurring, recurringPeriod } = expense;
+    const {
+      category,
+      amount,
+      date,
+      icon,
+      isRecurring,
+      recurringPeriod,
+      description,
+    } = expense;
 
     // Validation Checks
     if (!category.trim()) {
@@ -103,6 +95,7 @@ const Expense = () => {
         icon,
         isRecurring,
         recurringPeriod: isRecurring ? recurringPeriod : undefined,
+        description,
       });
 
       setOpenAddExpenseModal(false);
@@ -111,9 +104,88 @@ const Expense = () => {
     } catch (error: any) {
       console.error(
         "Error adding expense:",
-        error.response?.data?.message || error.message
+        error.response?.data?.message || error.message,
       );
       toast.error("Failed to add expense. Please try again.");
+    }
+  };
+
+  // Handle Edit Expense
+  const handleEditExpense = (expense: ExpenseData) => {
+    setEditingExpense(expense);
+    setOpenEditExpenseModal(true);
+  };
+
+  // Handle Update Expense
+  const handleUpdateExpense = async (updatedExpense: any) => {
+    const {
+      _id,
+      category,
+      amount,
+      date,
+      icon,
+      isRecurring,
+      recurringPeriod,
+      description,
+    } = updatedExpense;
+
+    // Validation Checks
+    if (!(category as string)?.trim()) {
+      toast.error("Category is required.");
+      return;
+    }
+
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      toast.error("Amount should be a valid number greater than 0.");
+      return;
+    }
+
+    if (!date) {
+      toast.error("Date is required.");
+      return;
+    }
+
+    if (isRecurring && !recurringPeriod) {
+      toast.error("Recurring period is required for recurring expenses.");
+      return;
+    }
+
+    try {
+      await axiosInstance.put(API_PATHS.EXPENSE.UPDATE_EXPENSE(_id as string), {
+        category,
+        amount: Number(amount),
+        date,
+        icon,
+        isRecurring,
+        recurringPeriod: isRecurring ? recurringPeriod : undefined,
+        description,
+      });
+
+      setOpenEditExpenseModal(false);
+      setEditingExpense(null);
+      toast.success("Expense updated successfully");
+      fetchExpenseDetails();
+    } catch (error: any) {
+      console.error(
+        "Error updating expense:",
+        error.response?.data?.message || error.message,
+      );
+      toast.error("Failed to update expense. Please try again.");
+    }
+  };
+
+  // Handle Toggle Recurring
+  const handleToggleRecurring = async (id: string) => {
+    try {
+      await axiosInstance.patch(API_PATHS.EXPENSE.TOGGLE_RECURRING_EXPENSE(id));
+      toast.success("Recurring status updated successfully");
+      fetchExpenseDetails();
+    } catch (error: any) {
+      console.error(
+        "Error toggling recurring:",
+        error.response?.data?.message || error.message,
+      );
+      toast.error("Failed to update recurring status. Please try again.");
     }
   };
 
@@ -128,7 +200,7 @@ const Expense = () => {
     } catch (error: any) {
       console.error(
         "Error deleting expense:",
-        error.response?.data?.message || error.message
+        error.response?.data?.message || error.message,
       );
       toast.error("Failed to delete expense. Please try again.");
     }
@@ -140,19 +212,19 @@ const Expense = () => {
       const response = await axiosInstance.get(
         API_PATHS.EXPENSE.DOWNLOAD_EXPENSE,
         {
-          responseType: "blob", 
-        }
+          responseType: "blob",
+        },
       );
 
       // Create a URL for the blob
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", "expense_details.xlsx"); 
+      link.setAttribute("download", "expense_details.xlsx");
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
-      window.URL.revokeObjectURL(url); 
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading expense details:", error);
       toast.error("Failed to download expense details. Please try again.");
@@ -161,31 +233,16 @@ const Expense = () => {
 
   useEffect(() => {
     void fetchExpenseDetails();
-  }, [predictiveMode]);
+  }, []);
 
   return (
     <DashboardLayout activeMenu="Expense">
-      <div className="my-5 mx-auto">
+      <div className="mx-auto my-5">
         <div className="grid grid-cols-1 gap-6">
-          <div className="flex justify-between items-center mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-800">Expenses</h1>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Predictive Mode</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={predictiveMode}
-                  onChange={(e) => setPredictiveMode(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-              <span className="text-xs text-gray-500">
-                {predictiveMode ? "Showing all (including future)" : "Current only"}
-              </span>
-            </div>
           </div>
-          
+
           <div className="">
             <ExpenseOverview
               transactions={expenseData}
@@ -198,6 +255,8 @@ const Expense = () => {
             onDelete={(id) => {
               setOpenDeleteAlert({ show: true, data: id });
             }}
+            onEdit={handleEditExpense}
+            onToggleRecurring={handleToggleRecurring}
             onDownload={handleDownloadExpenseDetails}
           />
 
@@ -210,13 +269,35 @@ const Expense = () => {
           </Modal>
 
           <Modal
+            isOpen={openEditExpenseModal}
+            onClose={() => {
+              setOpenEditExpenseModal(false);
+              setEditingExpense(null);
+            }}
+            title="Edit Expense"
+          >
+            {editingExpense && (
+              <EditExpenseForm
+                expense={editingExpense}
+                onUpdateExpense={handleUpdateExpense}
+                onCancel={() => {
+                  setOpenEditExpenseModal(false);
+                  setEditingExpense(null);
+                }}
+              />
+            )}
+          </Modal>
+
+          <Modal
             isOpen={openDeleteAlert.show}
             onClose={() => setOpenDeleteAlert({ show: false, data: null })}
             title="Delete Expense"
           >
             <DeleteAlert
               content="Are you sure you want to delete this expense detail?"
-              onDelete={() => openDeleteAlert.data && deleteExpense(openDeleteAlert.data)}
+              onDelete={() =>
+                openDeleteAlert.data && deleteExpense(openDeleteAlert.data)
+              }
             />
           </Modal>
         </div>

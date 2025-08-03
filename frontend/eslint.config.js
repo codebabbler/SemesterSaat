@@ -25,7 +25,8 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-floating-promises": "off",
       "@typescript-eslint/no-explicit-any": "off",
-      "prefer-const":"off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "prefer-const": "off",
       "@typescript-eslint/consistent-type-imports": [
         "warn",
         { prefer: "type-imports", fixStyle: "inline-type-imports" },

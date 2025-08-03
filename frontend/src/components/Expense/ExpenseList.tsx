@@ -4,28 +4,21 @@ import React from "react";
 import TransactionInfoCard from "~/components/Cards/TransactionInfoCard";
 import moment from "moment";
 import { LuDownload } from "react-icons/lu";
-
-interface Transaction {
-  _id: string;
-  category: string;
-  icon?: string;
-  date: string;
-  amount: number;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-  originalId?: string;
-}
+import type { ExpenseData } from "~/types/transaction.types";
 
 interface ExpenseListProps {
-  transactions: Transaction[];
+  transactions: ExpenseData[];
   onDelete: (id: string) => void;
+  onEdit: (transaction: ExpenseData) => void;
+  onToggleRecurring: (id: string) => void;
   onDownload: () => void;
 }
 
 const ExpenseList: React.FC<ExpenseListProps> = ({ 
   transactions, 
   onDelete, 
+  onEdit,
+  onToggleRecurring,
   onDownload 
 }) => {
   return (
@@ -42,12 +35,15 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
         {transactions?.map((expense) => (
           <TransactionInfoCard
             key={expense._id}
-            title={expense.category}
+            title={expense.description || expense.category}
+            badge={expense.category}
             icon={expense.icon}
             date={moment(expense.date).format("Do MMM YYYY")}
             amount={expense.amount}
             type="expense"
             onDelete={() => onDelete(expense.originalId ?? expense._id)}
+            onEdit={() => onEdit(expense)}
+            onToggleRecurring={() => onToggleRecurring(expense.originalId ?? expense._id)}
             isRecurring={expense.isRecurring}
             recurringPeriod={expense.recurringPeriod}
             isVirtual={expense.isVirtual}

@@ -1,57 +1,55 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Input from "~/components/Inputs/Input";
 import DatePicker from "~/components/Inputs/DatePicker";
 import { API_PATHS } from "~/utils/apiPaths";
 import toast from "react-hot-toast";
 import axiosInstance from "~/utils/axiosInstance";
-import type {
-  IncomeFormData,
-  PredictionResult,
-} from "~/types/transaction.types";
+import type { ExpenseData, PredictionResult } from "~/types/transaction.types";
 
-interface AddIncomeFormProps {
-  onAddIncome: (income: IncomeFormData) => void;
+interface EditExpenseFormProps {
+  expense: ExpenseData;
+  onUpdateExpense: (expense: ExpenseData) => void;
+  onCancel: () => void;
 }
 
-const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
-  const [income, setIncome] = useState<IncomeFormData>({
-    description: "",
-    source: "",
-    amount: "",
-    date: "",
-    icon: "",
-    isRecurring: false,
-    recurringPeriod: "",
-  });
-
+const EditExpenseForm: React.FC<EditExpenseFormProps> = ({
+  expense: initialExpense,
+  onUpdateExpense,
+  onCancel,
+}) => {
+  const [expense, setExpense] = useState<ExpenseData>(initialExpense);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [isPredicting, setIsPredicting] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
 
-  const commonIncomeSources = [
+  const standardCategories = [
     "Salary",
-    "Freelance",
-    "Business",
-    "Investment",
-    "Rental",
-    "Part-time",
-    "Commission",
-    "Bonus",
-    "Other",
+    "Shopping",
+    "Education",
+    "Health",
+    "Utilities",
+    "Entertainment",
+    "Transportation",
+    "Food",
+    "Unknown",
   ];
 
-  const handleChange = (key: keyof IncomeFormData, value: string | boolean) =>
-    setIncome({ ...income, [key]: value });
+  useEffect(() => {
+    setExpense(initialExpense);
+  }, [initialExpense]);
 
-  const predictSource = async (description: string) => {
+  const handleChange = (key: keyof ExpenseData, value: string | boolean) =>
+    setExpense({ ...expense, [key]: value });
+
+  const predictCategory = async (description: string) => {
     if (!description.trim() || description.length < 3) return;
 
     setIsPredicting(true);
     try {
       const response = await axiosInstance.post(
-        API_PATHS.INCOME.PREDICT_SOURCE,
+        API_PATHS.EXPENSE.PREDICT_CATEGORY,
         {
           description: description.trim(),
         },
@@ -60,18 +58,16 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
       const result: PredictionResult = response.data.data;
       setPrediction(result);
 
-      // Auto-fill source if confidence is high
-      if (result.isHighConfidence && result.source !== "Unknown") {
-        handleChange("source", result.source!);
+      if (result.isHighConfidence && result.category !== "Unknown") {
+        handleChange("category", result.category!);
         toast.success(
-          `Source predicted: ${result.source} (${Math.round(result.confidence * 100)}% confidence)`,
+          `Category predicted: ${result.category} (${Math.round(result.confidence * 100)}% confidence)`,
         );
       } else {
-        // Show feedback option for low confidence predictions
         setShowFeedback(true);
-        handleChange("source", result.source!);
+        handleChange("category", result.category!);
         toast(
-          `Low confidence prediction: ${result.source}. Please verify or provide feedback.`,
+          `Low confidence prediction: ${result.category}. Please verify or provide feedback.`,
           {
             icon: "⚠️",
             duration: 4000,
@@ -80,22 +76,22 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
       }
     } catch (error) {
       console.error("Prediction error:", error);
-      toast.error("Could not predict source. Please select manually.");
+      toast.error("Could not predict category. Please select manually.");
     } finally {
       setIsPredicting(false);
     }
   };
 
-  const sendFeedback = async (correctSource: string) => {
-    if (!income.description?.trim() || !correctSource.trim()) return;
+  const sendFeedback = async (correctCategory: string) => {
+    if (!expense.description?.trim() || !correctCategory.trim()) return;
 
     try {
-      await axiosInstance.post(API_PATHS.INCOME.FEEDBACK_SOURCE, {
-        description: income.description.trim(),
-        source: correctSource.trim(),
+      await axiosInstance.post(API_PATHS.EXPENSE.FEEDBACK_CATEGORY, {
+        description: expense.description.trim(),
+        category: correctCategory.trim(),
       });
 
-      handleChange("source", correctSource);
+      handleChange("category", correctCategory);
       setShowFeedback(false);
       toast.success(
         "Thank you for the feedback! This will help improve predictions.",
@@ -105,27 +101,45 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
       toast.error(
         "Could not send feedback, but your selection has been saved.",
       );
-      handleChange("source", correctSource);
+      handleChange("category", correctCategory);
       setShowFeedback(false);
     }
   };
 
   const handleDescriptionBlur = () => {
-    if (income.description?.trim()) {
-      predictSource(income.description);
+    if (
+      expense.description?.trim() &&
+      expense.description !== initialExpense.description
+    ) {
+      predictCategory(expense.description);
     }
   };
 
   return (
     <div>
+      <Input
+        value={expense.amount.toString()}
+        onChange={({ target }) => handleChange("amount", target.value)}
+        label="Amount"
+        placeholder=""
+        type="number"
+      />
+
+      <DatePicker
+        value={expense.date}
+        onChange={(date) => handleChange("date", date)}
+        label="Date"
+        placeholder="Select expense date"
+      />
+
       <div>
         <label className="text-[13px] text-slate-800">Description</label>
         <div className="input-box">
           <input
             type="text"
-            placeholder="e.g., monthly salary from company, freelance project payment"
+            placeholder="e.g., bought groceries from supermarket, paid electricity bill"
             className="w-full bg-transparent outline-none"
-            value={income.description}
+            value={expense.description}
             onChange={({ target }) => handleChange("description", target.value)}
             onBlur={handleDescriptionBlur}
           />
@@ -134,10 +148,10 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
 
       <div className="relative">
         <Input
-          value={income.source}
-          onChange={({ target }) => handleChange("source", target.value)}
-          label="Income Source"
-          placeholder="Source will be predicted automatically"
+          value={expense.category}
+          onChange={({ target }) => handleChange("category", target.value)}
+          label="Category"
+          placeholder="Category will be predicted automatically"
           type="text"
         />
         {isPredicting && (
@@ -157,8 +171,8 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
       {showFeedback && prediction && (
         <div className="mt-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
           <p className="mb-2 text-sm text-yellow-800">
-            Is &quot;{prediction.source}&quot; correct? If not, please select
-            the right source:
+            Is &quot;{prediction.category}&quot; correct? If not, please select
+            the right category:
           </p>
           <select
             className="w-full rounded border border-yellow-300 px-2 py-1 text-sm"
@@ -169,10 +183,10 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
             }}
             defaultValue=""
           >
-            <option value="">Select correct source</option>
-            {commonIncomeSources.map((source) => (
-              <option key={source} value={source}>
-                {source}
+            <option value="">Select correct category</option>
+            {standardCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
               </option>
             ))}
           </select>
@@ -181,47 +195,32 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
             className="mt-2 text-xs text-yellow-600 underline"
             onClick={() => setShowFeedback(false)}
           >
-            Keep &quot;{prediction.source}&quot; as is
+            Keep &quot;{prediction.category}&quot; as is
           </button>
         </div>
       )}
-
-      <Input
-        value={income.amount}
-        onChange={({ target }) => handleChange("amount", target.value)}
-        label="Amount"
-        placeholder=""
-        type="number"
-      />
-
-      <DatePicker
-        value={income.date}
-        onChange={(date) => handleChange("date", date)}
-        label="Date"
-        placeholder="Select income date"
-      />
 
       <div className="mt-4">
         <label className="flex items-center space-x-2">
           <input
             type="checkbox"
-            checked={income.isRecurring}
+            checked={expense.isRecurring}
             onChange={(e) => handleChange("isRecurring", e.target.checked)}
             className="form-checkbox h-4 w-4 text-blue-600"
           />
           <span className="text-sm font-medium text-gray-700">
-            Recurring Income
+            Recurring Expense
           </span>
         </label>
       </div>
 
-      {income.isRecurring && (
+      {expense.isRecurring && (
         <div className="mt-4">
           <label className="mb-2 block text-sm font-medium text-gray-700">
             Recurring Period
           </label>
           <select
-            value={income.recurringPeriod}
+            value={expense.recurringPeriod}
             onChange={(e) => handleChange("recurringPeriod", e.target.value)}
             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
           >
@@ -234,17 +233,24 @@ const AddIncomeForm: React.FC<AddIncomeFormProps> = ({ onAddIncome }) => {
         </div>
       )}
 
-      <div className="mt-6 flex justify-end">
+      <div className="mt-6 flex justify-end gap-2">
+        <button
+          type="button"
+          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
         <button
           type="button"
           className="add-btn add-btn-fill"
-          onClick={() => onAddIncome(income)}
+          onClick={() => onUpdateExpense(expense)}
         >
-          Add Income
+          Update Expense
         </button>
       </div>
     </div>
   );
 };
 
-export default AddIncomeForm;
+export default EditExpenseForm;
