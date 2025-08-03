@@ -10,10 +10,12 @@ interface IExpense extends Document {
   amount: number;
   date: Date;
   isRecurring?: boolean;
+  isVirtual?: boolean;
   recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
   nextRecurringDate?: Date;
   createdAt: Date;
   updatedAt: Date;
+  
 }
 
 const expenseSchema = new Schema(

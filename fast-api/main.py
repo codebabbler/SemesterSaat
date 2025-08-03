@@ -160,110 +160,110 @@ async def feedback(input: FeedbackInput):
         print(f"Feedback processing error: {e}")
         raise HTTPException(status_code=500, detail=f"Feedback error: {str(e)}")
 
-class GridWorld:
-    def __init__(self, size=4, goal_state=15):
-        self.size = size
-        self.goal_state = goal_state
+# class GridWorld:
+#     def __init__(self, size=4, goal_state=15):
+#         self.size = size
+#         self.goal_state = goal_state
 
-    def step(self, state: int, action: str):
-        row, col = divmod(state, self.size)
-        if action == 'up' and row > 0:
-            next_state = state - self.size
-        elif action == 'right' and col < self.size - 1:
-            next_state = state + 1
-        elif action == 'down' and row < self.size - 1:
-            next_state = state + self.size
-        elif action == 'left' and col > 0:
-            next_state = state - 1
-        else:
-            next_state = state
+#     def step(self, state: int, action: str):
+#         row, col = divmod(state, self.size)
+#         if action == 'up' and row > 0:
+#             next_state = state - self.size
+#         elif action == 'right' and col < self.size - 1:
+#             next_state = state + 1
+#         elif action == 'down' and row < self.size - 1:
+#             next_state = state + self.size
+#         elif action == 'left' and col > 0:
+#             next_state = state - 1
+#         else:
+#             next_state = state
 
-        if next_state == state:
-            reward = -0.1
-        else:
-            reward = 1.0 if next_state == self.goal_state else -0.01
+#         if next_state == state:
+#             reward = -0.1
+#         else:
+#             reward = 1.0 if next_state == self.goal_state else -0.01
 
-        done = next_state == self.goal_state
-        return next_state, reward, done
+#         done = next_state == self.goal_state
+#         return next_state, reward, done
 
-class QLearningAgent:
-    def __init__(self, states=16, actions=4, alpha=0.1, gamma=0.9, epsilon=0.1):
-        self.q_table = np.zeros((states, actions))
-        self.alpha = alpha
-        self.gamma = gamma
-        self.epsilon = epsilon
-        self.actions = ['up', 'right', 'down', 'left']
-        self.state = 0
-        self.goal_state = 15
+# class QLearningAgent:
+#     def __init__(self, states=16, actions=4, alpha=0.1, gamma=0.9, epsilon=0.1):
+#         self.q_table = np.zeros((states, actions))
+#         self.alpha = alpha
+#         self.gamma = gamma
+#         self.epsilon = epsilon
+#         self.actions = ['up', 'right', 'down', 'left']
+#         self.state = 0
+#         self.goal_state = 15
 
-    def choose_action(self, state):
-        if np.random.uniform(0, 1) < self.epsilon:
-            return np.random.randint(0, len(self.actions))
-        return np.argmax(self.q_table[state])
+#     def choose_action(self, state):
+#         if np.random.uniform(0, 1) < self.epsilon:
+#             return np.random.randint(0, len(self.actions))
+#         return np.argmax(self.q_table[state])
 
-    def update(self, state, action, reward, next_state):
-        best_next_action = np.argmax(self.q_table[next_state])
-        self.q_table[state, action] += self.alpha * (
-            reward + self.gamma * self.q_table[next_state, best_next_action] - self.q_table[state, action]
-        )
+#     def update(self, state, action, reward, next_state):
+#         best_next_action = np.argmax(self.q_table[next_state])
+#         self.q_table[state, action] += self.alpha * (
+#             reward + self.gamma * self.q_table[next_state, best_next_action] - self.q_table[state, action]
+#         )
 
-    def get_state(self):
-        return self.state
+#     def get_state(self):
+#         return self.state
 
-    def set_state(self, state):
-        self.state = state
+#     def set_state(self, state):
+#         self.state = state
 
-    def is_terminal(self):
-        return self.state == self.goal_state
+#     def is_terminal(self):
+#         return self.state == self.goal_state
 
-agent = QLearningAgent()
-grid_env = GridWorld()
+# agent = QLearningAgent()
+# grid_env = GridWorld()
 
-class RLActionInput(BaseModel):
-    action: str
+# class RLActionInput(BaseModel):
+#     action: str
 
-class RLStateInput(BaseModel):
-    state: int
+# class RLStateInput(BaseModel):
+#     state: int
 
-@app_rl.post("/rl/step")
-async def take_step(input: RLActionInput):
-    try:
-        current_state = agent.get_state()
-        if input.action not in agent.actions:
-            raise HTTPException(status_code=400, detail="Invalid action. Choose from 'up', 'right', 'down', 'left'.")
-        action_idx = agent.actions.index(input.action)
+# @app_rl.post("/rl/step")
+# async def take_step(input: RLActionInput):
+#     try:
+#         current_state = agent.get_state()
+#         if input.action not in agent.actions:
+#             raise HTTPException(status_code=400, detail="Invalid action. Choose from 'up', 'right', 'down', 'left'.")
+#         action_idx = agent.actions.index(input.action)
 
-        next_state, reward, done = grid_env.step(current_state, input.action)
+#         next_state, reward, done = grid_env.step(current_state, input.action)
 
-        agent.update(current_state, action_idx, reward, next_state)
-        agent.set_state(next_state)
+#         agent.update(current_state, action_idx, reward, next_state)
+#         agent.set_state(next_state)
 
-        agent.epsilon = max(agent.epsilon * 0.995, 0.01)
+#         agent.epsilon = max(agent.epsilon * 0.995, 0.01)
 
-        return {
-            "current_state": current_state,
-            "action": input.action,
-            "next_state": next_state,
-            "reward": reward,
-            "is_terminal": done
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"RL step error: {str(e)}")
+#         return {
+#             "current_state": current_state,
+#             "action": input.action,
+#             "next_state": next_state,
+#             "reward": reward,
+#             "is_terminal": done
+#         }
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"RL step error: {str(e)}")
 
-@app_rl.post("/rl/reset")
-async def reset_agent():
-    agent.set_state(0)
-    return {"message": "Agent reset to initial state (0)."}
+# @app_rl.post("/rl/reset")
+# async def reset_agent():
+#     agent.set_state(0)
+#     return {"message": "Agent reset to initial state (0)."}
 
-@app_rl.post("/rl/best_action")
-async def get_best_action(input: RLStateInput):
-    try:
-        if not 0 <= input.state < 16:
-            raise HTTPException(status_code=400, detail="Invalid state. Must be between 0 and 15.")
-        action_idx = np.argmax(agent.q_table[input.state])
-        return {"state": input.state, "best_action": agent.actions[action_idx]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Best action error: {str(e)}")
+# @app_rl.post("/rl/best_action")
+# async def get_best_action(input: RLStateInput):
+#     try:
+#         if not 0 <= input.state < 16:
+#             raise HTTPException(status_code=400, detail="Invalid state. Must be between 0 and 15.")
+#         action_idx = np.argmax(agent.q_table[input.state])
+#         return {"state": input.state, "best_action": agent.actions[action_idx]}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Best action error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
