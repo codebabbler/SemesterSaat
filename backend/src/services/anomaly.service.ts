@@ -267,12 +267,13 @@ class AnomalyService {
 
   async resetCategoryStats(userId: string, category: string, transactionType: 'expense' | 'income'): Promise<void> {
     try {
-      // Remove from database
+      // 1. Remove from database
       await AnomalyStats.deleteOne({ userId, category, transactionType });
 
-      // Remove from in-memory detector
+      // 2. Remove from in-memory detector
       const detector = await this.getDetector(userId, transactionType);
       detector.resetCategory(category);
+      
     } catch (error) {
       throw new Error(`Failed to reset category stats: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -280,15 +281,50 @@ class AnomalyService {
 
   async resetAllStats(userId: string, transactionType: 'expense' | 'income'): Promise<void> {
     try {
-      // Remove from database
+      // 1. Remove from database
       await AnomalyStats.deleteMany({ userId, transactionType });
 
-      // Remove from in-memory detector
+      // 2. Force LRU cache eviction
       const key = this.getDetectorKey(userId, transactionType);
       this.detectors.delete(key);
       this.loadingDetectors.delete(key);
+
+      // 3. Force cleanup of expired entries to ensure clean state
+      this.detectors.purgeStale();
+      
     } catch (error) {
       throw new Error(`Failed to reset all stats: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Complete nuclear reset - wipe ALL anomaly data for a user
+  async resetUserData(userId: string): Promise<void> {
+    try {
+      // 1. Delete all anomaly data from database
+      await Promise.all([
+        AnomalyStats.deleteMany({ userId }),
+        AnomalyDetection.deleteMany({ userId }),
+      ]);
+
+      // 2. Clear all user-related cache entries
+      for (const [key] of this.detectors.entries()) {
+        if (key.startsWith(`${userId}-`)) {
+          this.detectors.delete(key);
+        }
+      }
+      
+      // 3. Clear any loading operations for this user
+      for (const [key] of this.loadingDetectors.entries()) {
+        if (key.startsWith(`${userId}-`)) {
+          this.loadingDetectors.delete(key);
+        }
+      }
+
+      // 4. Force cleanup of expired entries
+      this.detectors.purgeStale();
+      
+    } catch (error) {
+      throw new Error(`Failed to reset user data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

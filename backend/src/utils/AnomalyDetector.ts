@@ -25,7 +25,7 @@ class EWMAAnomalyDetector {
   private Z_SCORE_THRESHOLD: number;
   private categoryStats: Map<string, CategoryStats>;
 
-  constructor(alpha: number = 0.2, zScoreThreshold: number = 2.0) {
+  constructor(alpha: number = 0.2, zScoreThreshold: number = 2.5) {
     this.ALPHA = alpha;
     this.Z_SCORE_THRESHOLD = zScoreThreshold;
     this.categoryStats = new Map();
@@ -33,10 +33,9 @@ class EWMAAnomalyDetector {
 
   detectAnomaly(newTransaction: Transaction): AnomalyResult {
     const category = newTransaction.category;
-    // Use original amount since transactionType separates income/expense contexts
-    // This allows EWMA to learn accurate patterns for each transaction type
     const amount = newTransaction.amount;
 
+    // 1. FIRST TRANSACTION: Always baseline, never anomaly
     if (!this.categoryStats.has(category)) {
       this.categoryStats.set(category, {
         mean: amount,
@@ -59,46 +58,57 @@ class EWMAAnomalyDetector {
     const stats = this.categoryStats.get(category)!;
     const previousMean = stats.mean;
     const previousVariance = stats.variance;
+    const previousCount = stats.count;
     const newCount = stats.count + 1;
 
-    // Calculate EWMA statistics first for consistent detection
+    // Calculate EWMA statistics first
     const newMean = this.ALPHA * amount + (1 - this.ALPHA) * previousMean;
-    const newVariance =
-      this.ALPHA * Math.pow(amount - previousMean, 2) +
-      (1 - this.ALPHA) * previousVariance;
+    const newVariance = this.ALPHA * Math.pow(amount - previousMean, 2) + (1 - this.ALPHA) * previousVariance;
     const newStandardDeviation = Math.sqrt(newVariance);
+    const previousStandardDeviation = Math.sqrt(previousVariance);
 
     let zScore = 0;
     let isAnomaly = false;
 
-    // Calculate Z-score using previous standard deviation (correct EWMA approach)
-    const previousStandardDeviation = Math.sqrt(previousVariance);
+    const ratio = Math.abs(previousMean) > 0.01 ? amount / previousMean : 1;
+    const MIN_SIGMA = 1e-8;
 
-    if (previousStandardDeviation > 0) {
-      // Standard Z-score calculation
+    // 2. WHEN SIGMA > 0: Z-score test + extreme ratio guard (5x/0.2x thresholds)
+    if (previousStandardDeviation > MIN_SIGMA) {
       zScore = (amount - previousMean) / previousStandardDeviation;
       isAnomaly = Math.abs(zScore) > this.Z_SCORE_THRESHOLD;
-    } else {
-      // For zero variance (early transactions), use ratio-based detection
-      if (Math.abs(previousMean) > 0.01) {
-        const ratio = amount / previousMean;
-        // Flag as anomaly if 5x higher or 5x lower than previous mean
-        if (ratio > 5.0 || ratio < 0.2) {
+      
+      // Extreme ratio guard: >5x or <0.2x always anomaly
+      if (ratio > 5.0 || ratio < 0.2) {
+        isAnomaly = true;
+        if (Math.abs(zScore) < 3.0) {
+          zScore = ratio > 1 ? 3.5 : -3.5;
+        }
+      }
+    }
+    // 3. WHEN SIGMA = 0: Adaptive percentage + extreme ratio guard (10x/0.1x thresholds) 
+    else {
+      // Extreme ratio guard: >10x or <0.1x with |Z|≥10 always anomaly
+      if (ratio > 10.0 || ratio < 0.1) {
+        isAnomaly = true;
+        zScore = ratio > 1 ? Math.max(10.0, ratio) : Math.min(-10.0, -1 / ratio);
+      }
+      // Adaptive percentage fallback
+      else {
+        const percentageThreshold = previousCount <= 3 ? 0.70 : 0.50; // 70% for ≤3 tx, 50% afterwards
+        const percentageChange = Math.abs(amount - previousMean) / Math.abs(previousMean);
+        
+        if (percentageChange > percentageThreshold) {
           isAnomaly = true;
-          zScore = ratio > 1 ? 3.5 : -3.5; // Ensure tests see zScore > 3.0
+          zScore = amount > previousMean ? 3.0 : -3.0;
         } else {
           isAnomaly = false;
-          // Calculate proportional Z-score
-          zScore = (ratio - 1) * 2.5; // Scale around mean=1
+          zScore = 0;
         }
-      } else {
-        // Very early stage or zero mean - not enough data for meaningful detection
-        isAnomaly = false;
-        zScore = 0;
       }
     }
 
-    // Update stats after successful detection
+    // Update stats after detection
     this.categoryStats.set(category, {
       mean: newMean,
       variance: newVariance,

@@ -130,9 +130,45 @@ const resetAllStats = asyncHandler(
   }
 );
 
+// Nuclear reset - wipe ALL anomaly data for user (for testing)
+const nuclearResetUserData = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    await AnomalyService.resetUserData(req.user._id);
+
+    res.status(200).json(
+      new ApiResponse(200, null, "All anomaly data reset successfully (nuclear reset)")
+    );
+  }
+);
+
+// Debug endpoint - get detector state for validation
+const getDetectorDebugInfo = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const cacheStats = AnomalyService.getCacheStats();
+    
+    res.status(200).json(
+      new ApiResponse(200, {
+        cacheStats,
+        userId: req.user._id,
+        timestamp: new Date().toISOString()
+      }, "Detector debug info retrieved successfully")
+    );
+  }
+);
+
 export {
   getAnomalousTransactions,
   getAnomalyStats,
   resetCategoryStats,
   resetAllStats,
+  nuclearResetUserData,
+  getDetectorDebugInfo,
 };

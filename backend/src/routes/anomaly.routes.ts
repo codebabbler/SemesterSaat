@@ -4,6 +4,8 @@ import {
   getAnomalyStats,
   resetCategoryStats,
   resetAllStats,
+  nuclearResetUserData,
+  getDetectorDebugInfo,
 } from "../controllers/anomaly.controller";
 import { verifyJWT } from "../middleware/auth.middleware";
 
@@ -25,5 +27,11 @@ router.route("/reset/category")
 
 router.route("/reset/all")
   .post(resetAllStats);               // POST /api/v1/anomaly/reset/all - Reset all stats for transaction type
+
+router.route("/reset/nuclear")
+  .post(nuclearResetUserData);        // POST /api/v1/anomaly/reset/nuclear - Nuclear reset all user data
+
+router.route("/debug")
+  .get(getDetectorDebugInfo);         // GET /api/v1/anomaly/debug - Get detector debug info
 
 export default router;
