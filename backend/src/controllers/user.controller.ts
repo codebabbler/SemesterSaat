@@ -79,7 +79,7 @@ const logoutUser = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    await UserService.logoutUser(req.user._id);
+    await UserService.logoutUser(req.user._id.toString());
 
     const options = {
       httpOnly: true,
@@ -132,7 +132,7 @@ const changePassword = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    await UserService.changePassword(req.user._id, oldPassword, newPassword);
+    await UserService.changePassword(req.user._id.toString(), oldPassword, newPassword);
 
     res
       .status(200)
@@ -162,7 +162,7 @@ const updateUserProfile = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const updatedUser = await UserService.updateUserProfile(req.user._id, {
+    const updatedUser = await UserService.updateUserProfile(req.user._id.toString(), {
       fullName,
       username,
       email,

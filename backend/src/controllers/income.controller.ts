@@ -19,7 +19,7 @@ const addIncome = asyncHandler(
     const parsedDate = new Date(date);
 
     const result = await IncomeService.createIncome({
-      userId: req.user._id,
+      userId: req.user._id.toString(),
       icon,
       source,
       amount,

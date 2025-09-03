@@ -22,7 +22,7 @@ const getDashboardData = asyncHandler(
       throw new ApiErrors(400, "Limit must be between 1 and 50");
     }
 
-    const dashboardData = await DashboardService.getDashboardData(req.user._id, {
+    const dashboardData = await DashboardService.getDashboardData(req.user._id.toString(), {
       period: periodDays,
       limit: limitNum,
       predictive: predictive === "true",
@@ -46,7 +46,7 @@ const getFinancialSummary = asyncHandler(
     const start = startDate ? new Date(startDate as string) : undefined;
     const end = endDate ? new Date(endDate as string) : undefined;
 
-    const summary = await DashboardService.getFinancialSummary(req.user._id, {
+    const summary = await DashboardService.getFinancialSummary(req.user._id.toString(), {
       startDate: start,
       endDate: end,
     });
@@ -66,7 +66,7 @@ const getCashFlowAnalysis = asyncHandler(
 
     const { period = "monthly" } = req.query;
 
-    const cashFlow = await DashboardService.getCashFlowAnalysis(req.user._id, {
+    const cashFlow = await DashboardService.getCashFlowAnalysis(req.user._id.toString(), {
       period: period as 'daily' | 'weekly' | 'monthly' | 'yearly',
     });
 

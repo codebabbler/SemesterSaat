@@ -19,7 +19,7 @@ const addExpense = asyncHandler(
     const parsedDate = new Date(date);
 
     const result = await ExpenseService.createExpense({
-      userId: req.user._id,
+      userId: req.user._id.toString(),
       icon,
       category,
       amount,

@@ -36,7 +36,7 @@ const getAnomalousTransactions = asyncHandler(
     }
 
     const result = await AnomalyService.getAnomalousTransactions(
-      req.user._id,
+      req.user._id.toString(),
       transactionType as 'expense' | 'income' | undefined,
       limitNum,
       pageNum
@@ -63,7 +63,7 @@ const getAnomalyStats = asyncHandler(
     }
 
     const stats = await AnomalyService.getAnomalyStats(
-      req.user._id,
+      req.user._id.toString(),
       transactionType as 'expense' | 'income' | undefined
     );
 
@@ -91,7 +91,7 @@ const resetCategoryStats = asyncHandler(
     }
 
     await AnomalyService.resetCategoryStats(
-      req.user._id,
+      req.user._id.toString(),
       category.trim(),
       transactionType as 'expense' | 'income'
     );
@@ -120,7 +120,7 @@ const resetAllStats = asyncHandler(
     }
 
     await AnomalyService.resetAllStats(
-      req.user._id,
+      req.user._id.toString(),
       transactionType as 'expense' | 'income'
     );
 
@@ -137,7 +137,7 @@ const nuclearResetUserData = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    await AnomalyService.resetUserData(req.user._id);
+    await AnomalyService.resetUserData(req.user._id.toString());
 
     res.status(200).json(
       new ApiResponse(200, null, "All anomaly data reset successfully (nuclear reset)")
@@ -157,7 +157,7 @@ const getDetectorDebugInfo = asyncHandler(
     res.status(200).json(
       new ApiResponse(200, {
         cacheStats,
-        userId: req.user._id,
+        userId: req.user._id.toString(),
         timestamp: new Date().toISOString()
       }, "Detector debug info retrieved successfully")
     );

@@ -163,7 +163,7 @@ class IncomeService {
     try {
       anomalyResult = await AnomalyService.detectAnomaly(
         userId,
-        income._id,
+        income._id.toString(),
         'income',
         source.trim(),
         amount

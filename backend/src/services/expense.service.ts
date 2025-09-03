@@ -172,7 +172,7 @@ class ExpenseService {
     try {
       anomalyResult = await AnomalyService.detectAnomaly(
         userId,
-        expense._id,
+        expense._id.toString(),
         'expense',
         category.trim(),
         amount
