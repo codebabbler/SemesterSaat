@@ -110,7 +110,7 @@ const updateExpense = asyncHandler(
     // Parse date if provided
     const parsedDate = date ? new Date(date) : undefined;
 
-    const updatedExpense = await ExpenseService.updateExpense(
+    const updatedExpenseWithAnomaly = await ExpenseService.updateExpense(
       req.user._id,
       id,
       {
@@ -126,7 +126,11 @@ const updateExpense = asyncHandler(
     res
       .status(200)
       .json(
-        new ApiResponse(200, updatedExpense, "Expense updated successfully")
+        new ApiResponse(
+          200,
+          updatedExpenseWithAnomaly,
+          "Expense updated successfully"
+        )
       );
   }
 );

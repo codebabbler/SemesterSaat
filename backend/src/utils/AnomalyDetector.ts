@@ -136,7 +136,7 @@ class EWMAAnomalyDetector {
       isAnomaly: isAnomaly,
       zScore: zScore,
       message: isAnomaly
-        ? `Anomaly detected: Transaction amount NPR${amount.toFixed(2)} is ${Math.abs(zScore).toFixed(2)} standard deviations from EWMA mean (NPR${previousMean.toFixed(2)}) for category '${category}'.`
+        ? "Anomaly detected: This transaction amount is unusual compared to your previous transactions in this category."
         : `Normal transaction: Amount NPR${amount.toFixed(2)} is within normal range for category '${category}' (Z-score: ${zScore.toFixed(2)}).`,
       category: category,
       amount: amount,

@@ -13,7 +13,7 @@ import {
   LuDollarSign,
 } from "react-icons/lu";
 import { formatCurrency } from "~/utils/constants";
-import type { RecurringPeriod } from "~/types/transaction.types";
+import type { RecurringPeriod, AnomalyTransaction } from "~/types/transaction.types";
 
 interface TransactionInfoCardProps {
   icon?: string;
@@ -29,6 +29,7 @@ interface TransactionInfoCardProps {
   isRecurring?: boolean;
   recurringPeriod?: RecurringPeriod;
   isVirtual?: boolean;
+  anomalyData?: AnomalyTransaction;
 }
 
 const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
@@ -45,6 +46,7 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
   isRecurring,
   recurringPeriod,
   isVirtual,
+  anomalyData,
 }) => {
   const getAmountStyles = () =>
     type === "income" ? "bg-green-50 text-green-500" : "bg-red-50 text-red-500";
@@ -57,9 +59,11 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
 
       <div className="flex flex-1 flex-col justify-between">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-700">{title}</p>
-            <p className="mt-1 text-xs text-gray-400">{date}</p>
+          <div className="flex items-center gap-2">
+            <div>
+              <p className="text-sm font-medium text-gray-700">{title}</p>
+              <p className="mt-1 text-xs text-gray-400">{date}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {onEdit && !isVirtual && (
@@ -91,7 +95,7 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
             </div>
           </div>
         </div>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
           {badge && (
             <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
               {badge}
@@ -100,6 +104,11 @@ const TransactionInfoCard: React.FC<TransactionInfoCardProps> = ({
           {isRecurring && (
             <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
               Recurring {recurringPeriod}
+            </span>
+          )}
+          {anomalyData && (
+            <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
+              Anomaly
             </span>
           )}
         </div>
