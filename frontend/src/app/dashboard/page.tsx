@@ -123,9 +123,6 @@ const Dashboard = () => {
     void fetchDashboardData();
   }, []);
 
-  useEffect(() => {
-    console.log({ dashboardData });
-  }, [dashboardData]);
 
   // Create expense transactions for the ExpenseTransactions component
   const expenseTransactions =

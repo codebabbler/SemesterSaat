@@ -24,7 +24,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
   onDownload 
 }) => {
   // Helper function to check if a transaction is anomalous
-  console.log(anomalyTransactions);
   const isTransactionAnomalous = (transactionId: string): AnomalyTransaction | undefined => {
     if (!Array.isArray(anomalyTransactions)) return undefined;
     return anomalyTransactions.find(anomaly => anomaly.transactionId === transactionId);

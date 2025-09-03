@@ -89,6 +89,6 @@ export interface AnomalyTransaction {
   message: string;
   category: string;
   amount: number;
-  date: string;
+  updatedAt: string;
   createdAt: string;
 }
