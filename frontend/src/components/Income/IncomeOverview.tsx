@@ -4,15 +4,7 @@ import React, { useEffect, useState } from "react";
 import { LuPlus } from "react-icons/lu";
 import CustomBarChart from "~/components/Charts/CustomBarChart";
 import { prepareIncomeBarChartData } from "~/utils/helper";
-
-interface Transaction {
-  date: string;
-  amount: number;
-  source: string;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-}
+import type { IncomeData } from "~/types/transaction.types";
 
 interface ChartData {
   month: string;
@@ -21,18 +13,18 @@ interface ChartData {
 }
 
 interface IncomeOverviewProps {
-  transactions: Transaction[];
+  transactions: IncomeData[];
   onAddIncome: () => void;
 }
 
-const IncomeOverview: React.FC<IncomeOverviewProps> = ({ 
-  transactions, 
-  onAddIncome 
+const IncomeOverview: React.FC<IncomeOverviewProps> = ({
+  transactions,
+  onAddIncome,
 }) => {
   const [chartData, setChartData] = useState<ChartData[]>([]);
 
   useEffect(() => {
-    const result = prepareIncomeBarChartData(transactions);
+    const result = prepareIncomeBarChartData(transactions as any);
     setChartData(result);
   }, [transactions]);
 
@@ -41,7 +33,7 @@ const IncomeOverview: React.FC<IncomeOverviewProps> = ({
       <div className="flex items-center justify-between">
         <div className="">
           <h5 className="text-lg">Income Overview</h5>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="mt-0.5 text-xs text-gray-400">
             Track your earnings over time and analyze your income trends.
           </p>
         </div>

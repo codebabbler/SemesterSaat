@@ -13,7 +13,15 @@ const addExpense = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { icon, category, amount, date, isRecurring, recurringPeriod } = req.body;
+    const {
+      icon,
+      description,
+      category,
+      amount,
+      date,
+      isRecurring,
+      recurringPeriod,
+    } = req.body;
 
     // Parse date
     const parsedDate = new Date(date);
@@ -28,37 +36,39 @@ const addExpense = asyncHandler(
       recurringPeriod,
     });
 
-    res.status(201).json(
-      new ApiResponse(201, result, "Expense added successfully")
-    );
+    res
+      .status(201)
+      .json(new ApiResponse(201, result, "Expense added successfully"));
   }
 );
 
-
-// Get All Expenses (For Logged-in User)
 const getAllExpenses = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc", predictive = "false" } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = "date",
+      sortOrder = "desc",
+    } = req.query;
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
-    const sortOrderTyped = sortOrder as 'asc' | 'desc';
+    const sortOrderTyped = sortOrder as "asc" | "desc";
 
     const result = await ExpenseService.getAllExpenses(req.user._id, {
       page: pageNum,
       limit: limitNum,
       sortBy: sortBy as string,
       sortOrder: sortOrderTyped,
-      predictive: predictive === "true",
     });
 
-    res.status(200).json(
-      new ApiResponse(200, result, "Expenses retrieved successfully")
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, result, "Expenses retrieved successfully"));
   }
 );
 
@@ -73,9 +83,9 @@ const getExpenseById = asyncHandler(
 
     const expense = await ExpenseService.getExpenseById(req.user._id, id);
 
-    res.status(200).json(
-      new ApiResponse(200, expense, "Expense retrieved successfully")
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, expense, "Expense retrieved successfully"));
   }
 );
 
@@ -87,23 +97,37 @@ const updateExpense = asyncHandler(
     }
 
     const { id } = req.params;
-    const { icon, category, amount, date, isRecurring, recurringPeriod } = req.body;
+    const {
+      icon,
+      description,
+      category,
+      amount,
+      date,
+      isRecurring,
+      recurringPeriod,
+    } = req.body;
 
     // Parse date if provided
     const parsedDate = date ? new Date(date) : undefined;
 
-    const updatedExpense = await ExpenseService.updateExpense(req.user._id, id, {
-      icon,
-      category,
-      amount,
-      date: parsedDate,
-      isRecurring,
-      recurringPeriod,
-    });
-
-    res.status(200).json(
-      new ApiResponse(200, updatedExpense, "Expense updated successfully")
+    const updatedExpense = await ExpenseService.updateExpense(
+      req.user._id,
+      id,
+      {
+        icon,
+        category,
+        amount,
+        date: parsedDate,
+        isRecurring,
+        recurringPeriod,
+      }
     );
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(200, updatedExpense, "Expense updated successfully")
+      );
   }
 );
 
@@ -118,9 +142,9 @@ const deleteExpense = asyncHandler(
 
     await ExpenseService.deleteExpense(req.user._id, id);
 
-    res.status(200).json(
-      new ApiResponse(200, null, "Expense deleted successfully")
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, null, "Expense deleted successfully"));
   }
 );
 
@@ -133,11 +157,20 @@ const getExpensesByCategory = asyncHandler(
 
     const { category } = req.params;
 
-    const expenses = await ExpenseService.getExpensesByCategory(req.user._id, category);
-
-    res.status(200).json(
-      new ApiResponse(200, expenses, "Expenses by category retrieved successfully")
+    const expenses = await ExpenseService.getExpensesByCategory(
+      req.user._id,
+      category
     );
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          expenses,
+          "Expenses by category retrieved successfully"
+        )
+      );
   }
 );
 
@@ -148,7 +181,9 @@ const downloadExpenseExcel = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { filepath, filename } = await ExpenseService.generateExpenseExcel(req.user._id);
+    const { filepath, filename } = await ExpenseService.generateExpenseExcel(
+      req.user._id
+    );
 
     // Set proper headers for file download
     res.setHeader(
@@ -189,9 +224,15 @@ const getExpenseStats = asyncHandler(
 
     const result = await ExpenseService.getExpenseStats(req.user._id, filter);
 
-    res.status(200).json(
-      new ApiResponse(200, result, "Expense statistics retrieved successfully")
-    );
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          result,
+          "Expense statistics retrieved successfully"
+        )
+      );
   }
 );
 
@@ -205,13 +246,19 @@ const getMonthlyExpenseTrends = asyncHandler(
     const { year = new Date().getFullYear() } = req.query;
 
     const trends = await ExpenseService.getMonthlyExpenseTrends(
-      req.user._id, 
+      req.user._id,
       parseInt(year as string)
     );
 
-    res.status(200).json(
-      new ApiResponse(200, trends, "Monthly expense trends retrieved successfully")
-    );
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          trends,
+          "Monthly expense trends retrieved successfully"
+        )
+      );
   }
 );
 
@@ -226,9 +273,15 @@ const predictExpenseCategory = asyncHandler(
 
     const result = await ExpenseService.predictExpenseCategory(description);
 
-    res.status(200).json(
-      new ApiResponse(200, result, "Category prediction completed successfully")
-    );
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          result,
+          "Category prediction completed successfully"
+        )
+      );
   }
 );
 
@@ -241,11 +294,14 @@ const sendExpenseCategoryFeedback = asyncHandler(
 
     const { description, category } = req.body;
 
-    const result = await ExpenseService.sendExpenseCategoryFeedback(description, category);
-
-    res.status(200).json(
-      new ApiResponse(200, result, "Feedback sent successfully")
+    const result = await ExpenseService.sendExpenseCategoryFeedback(
+      description,
+      category
     );
+
+    res
+      .status(200)
+      .json(new ApiResponse(200, result, "Feedback sent successfully"));
   }
 );
 

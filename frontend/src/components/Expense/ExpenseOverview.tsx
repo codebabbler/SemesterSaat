@@ -4,15 +4,7 @@ import React, { useEffect, useState } from "react";
 import { LuPlus } from "react-icons/lu";
 import CustomLineChart from "~/components/Charts/CustomLineChart";
 import { prepareExpenseLineChartData } from "~/utils/helper";
-
-interface Transaction {
-  date: string;
-  amount: number;
-  category: string;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-}
+import type { ExpenseData } from "~/types/transaction.types";
 
 interface ChartData {
   month: string;
@@ -21,7 +13,7 @@ interface ChartData {
 }
 
 interface ExpenseOverviewProps {
-  transactions: Transaction[];
+  transactions: ExpenseData[];
   onExpenseIncome: () => void;
 }
 

@@ -5,31 +5,17 @@ import DatePicker from "~/components/Inputs/DatePicker";
 import { API_PATHS } from "~/utils/apiPaths";
 import toast from "react-hot-toast";
 import axiosInstance from "~/utils/axiosInstance";
-
-interface ExpenseData {
-  description: string;
-  category: string;
-  amount: string;
-  date: string;
-  icon: string;
-  isRecurring: boolean;
-  recurringPeriod: "daily" | "weekly" | "monthly" | "yearly" | "";
-}
-
-interface PredictionResult {
-  category: string;
-  confidence: number;
-  isHighConfidence: boolean;
-  suggestFeedback: boolean;
-  mlServiceDown?: boolean;
-}
+import type {
+  ExpenseFormData,
+  PredictionResult,
+} from "~/types/transaction.types";
 
 interface AddExpenseFormProps {
-  onAddExpense: (expense: ExpenseData) => void;
+  onAddExpense: (expense: ExpenseFormData) => void;
 }
 
 const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAddExpense }) => {
-  const [expense, setExpense] = useState<ExpenseData>({
+  const [expense, setExpense] = useState<ExpenseFormData>({
     description: "",
     category: "",
     amount: "",
@@ -55,7 +41,7 @@ const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAddExpense }) => {
     "Unknown",
   ];
 
-  const handleChange = (key: keyof ExpenseData, value: string | boolean) =>
+  const handleChange = (key: keyof ExpenseFormData, value: string | boolean) =>
     setExpense({ ...expense, [key]: value });
 
   const predictCategory = async (description: string) => {
@@ -73,16 +59,14 @@ const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAddExpense }) => {
       const result: PredictionResult = response.data.data;
       setPrediction(result);
 
-      // Auto-fill category if confidence is high
       if (result.isHighConfidence && result.category !== "Unknown") {
-        handleChange("category", result.category);
+        handleChange("category", result.category!);
         toast.success(
           `Category predicted: ${result.category} (${Math.round(result.confidence * 100)}% confidence)`,
         );
       } else {
-        // Show feedback option for low confidence predictions
         setShowFeedback(true);
-        handleChange("category", result.category);
+        handleChange("category", result.category!);
         toast(
           `Low confidence prediction: ${result.category}. Please verify or provide feedback.`,
           {
@@ -100,7 +84,7 @@ const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAddExpense }) => {
   };
 
   const sendFeedback = async (correctCategory: string) => {
-    if (!expense.description.trim() || !correctCategory.trim()) return;
+    if (!expense.description?.trim() || !correctCategory.trim()) return;
 
     try {
       await axiosInstance.post(API_PATHS.EXPENSE.FEEDBACK_CATEGORY, {
@@ -124,13 +108,28 @@ const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAddExpense }) => {
   };
 
   const handleDescriptionBlur = () => {
-    if (expense.description.trim()) {
+    if (expense.description?.trim()) {
       predictCategory(expense.description);
     }
   };
 
   return (
     <div>
+      <Input
+        value={expense.amount}
+        onChange={({ target }) => handleChange("amount", target.value)}
+        label="Amount"
+        placeholder=""
+        type="number"
+      />
+
+      <DatePicker
+        value={expense.date}
+        onChange={(date) => handleChange("date", date)}
+        label="Date"
+        placeholder="Select expense date"
+      />
+
       <div>
         <label className="text-[13px] text-slate-800">Description</label>
         <div className="input-box">
@@ -198,21 +197,6 @@ const AddExpenseForm: React.FC<AddExpenseFormProps> = ({ onAddExpense }) => {
           </button>
         </div>
       )}
-
-      <Input
-        value={expense.amount}
-        onChange={({ target }) => handleChange("amount", target.value)}
-        label="Amount"
-        placeholder=""
-        type="number"
-      />
-
-      <DatePicker
-        value={expense.date}
-        onChange={(date) => handleChange("date", date)}
-        label="Date"
-        placeholder="Select expense date"
-      />
 
       <div className="mt-4">
         <label className="flex items-center space-x-2">

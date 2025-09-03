@@ -4,28 +4,21 @@ import React from "react";
 import TransactionInfoCard from "~/components/Cards/TransactionInfoCard";
 import moment from "moment";
 import { LuDownload } from "react-icons/lu";
-
-interface Transaction {
-  _id: string;
-  source: string;
-  icon?: string;
-  date: string;
-  amount: number;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-  originalId?: string;
-}
+import type { IncomeData } from "~/types/transaction.types";
 
 interface IncomeListProps {
-  transactions: Transaction[];
+  transactions: IncomeData[];
   onDelete: (id: string) => void;
+  onEdit: (transaction: IncomeData) => void;
+  onToggleRecurring: (id: string) => void;
   onDownload: () => void;
 }
 
 const IncomeList: React.FC<IncomeListProps> = ({ 
   transactions, 
   onDelete, 
+  onEdit,
+  onToggleRecurring,
   onDownload 
 }) => {
   return (
@@ -42,12 +35,15 @@ const IncomeList: React.FC<IncomeListProps> = ({
         {transactions?.map((income) => (
           <TransactionInfoCard
             key={income._id}
-            title={income.source}
+            title={income.description || income.source}
+            badge={income.source}
             icon={income.icon}
             date={moment(income.date).format("Do MMM YYYY")}
             amount={income.amount}
             type="income"
             onDelete={() => onDelete(income.originalId ?? income._id)}
+            onEdit={() => onEdit(income)}
+            onToggleRecurring={() => onToggleRecurring(income.originalId ?? income._id)}
             isRecurring={income.isRecurring}
             recurringPeriod={income.recurringPeriod}
             isVirtual={income.isVirtual}

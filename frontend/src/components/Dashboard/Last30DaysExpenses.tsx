@@ -3,17 +3,8 @@
 import React, { useEffect, useState } from "react";
 import CustomBarChart from "~/components/Charts/CustomBarChart";
 import { prepareExpenseBarChartData } from "~/utils/helper";
+import type { ExpenseData } from "~/types/transaction.types";
 
-interface ExpenseData {
-  _id: string;
-  category: string;
-  amount: number;
-  date: string;
-  icon?: string;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-}
 
 interface Last30DaysExpensesProps {
   data: ExpenseData[];

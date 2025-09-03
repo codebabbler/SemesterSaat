@@ -13,7 +13,8 @@ const addIncome = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { icon, source, amount, date, isRecurring, recurringPeriod } = req.body;
+    const { icon, source, amount, date, isRecurring, recurringPeriod } =
+      req.body;
 
     // Parse date
     const parsedDate = new Date(date);
@@ -28,12 +29,11 @@ const addIncome = asyncHandler(
       recurringPeriod,
     });
 
-    res.status(201).json(
-      new ApiResponse(201, result, "Income added successfully")
-    );
+    res
+      .status(201)
+      .json(new ApiResponse(201, result, "Income added successfully"));
   }
 );
-
 
 // Get All Income (For Logged-in User)
 const getAllIncome = asyncHandler(
@@ -42,23 +42,27 @@ const getAllIncome = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { page = 1, limit = 10, sortBy = "date", sortOrder = "desc", predictive = "false" } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = "date",
+      sortOrder = "desc",
+    } = req.query;
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
-    const sortOrderTyped = sortOrder as 'asc' | 'desc';
+    const sortOrderTyped = sortOrder as "asc" | "desc";
 
     const result = await IncomeService.getAllIncome(req.user._id, {
       page: pageNum,
       limit: limitNum,
       sortBy: sortBy as string,
       sortOrder: sortOrderTyped,
-      predictive: predictive === "true",
     });
 
-    res.status(200).json(
-      new ApiResponse(200, result, "Income retrieved successfully")
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, result, "Income retrieved successfully"));
   }
 );
 
@@ -73,9 +77,9 @@ const getIncomeById = asyncHandler(
 
     const income = await IncomeService.getIncomeById(req.user._id, id);
 
-    res.status(200).json(
-      new ApiResponse(200, income, "Income retrieved successfully")
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, income, "Income retrieved successfully"));
   }
 );
 
@@ -87,7 +91,8 @@ const updateIncome = asyncHandler(
     }
 
     const { id } = req.params;
-    const { icon, source, amount, date, isRecurring, recurringPeriod } = req.body;
+    const { icon, source, amount, date, isRecurring, recurringPeriod } =
+      req.body;
 
     // Parse date if provided
     const parsedDate = date ? new Date(date) : undefined;
@@ -101,9 +106,9 @@ const updateIncome = asyncHandler(
       recurringPeriod,
     });
 
-    res.status(200).json(
-      new ApiResponse(200, updatedIncome, "Income updated successfully")
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, updatedIncome, "Income updated successfully"));
   }
 );
 
@@ -118,9 +123,9 @@ const deleteIncome = asyncHandler(
 
     await IncomeService.deleteIncome(req.user._id, id);
 
-    res.status(200).json(
-      new ApiResponse(200, null, "Income deleted successfully")
-    );
+    res
+      .status(200)
+      .json(new ApiResponse(200, null, "Income deleted successfully"));
   }
 );
 
@@ -131,7 +136,9 @@ const downloadIncomeExcel = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { filepath, filename } = await IncomeService.generateIncomeExcel(req.user._id);
+    const { filepath, filename } = await IncomeService.generateIncomeExcel(
+      req.user._id
+    );
 
     // Set proper headers for file download
     res.setHeader(
@@ -171,9 +178,11 @@ const getIncomeStats = asyncHandler(
 
     const result = await IncomeService.getIncomeStats(req.user._id, filter);
 
-    res.status(200).json(
-      new ApiResponse(200, result, "Income statistics retrieved successfully")
-    );
+    res
+      .status(200)
+      .json(
+        new ApiResponse(200, result, "Income statistics retrieved successfully")
+      );
   }
 );
 
@@ -188,9 +197,15 @@ const predictIncomeSource = asyncHandler(
 
     const result = await IncomeService.predictIncomeSource(description);
 
-    res.status(200).json(
-      new ApiResponse(200, result, "Income source prediction completed successfully")
-    );
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          result,
+          "Income source prediction completed successfully"
+        )
+      );
   }
 );
 
@@ -203,11 +218,16 @@ const sendIncomeSourceFeedback = asyncHandler(
 
     const { description, source } = req.body;
 
-    const result = await IncomeService.sendIncomeSourceFeedback(description, source);
-
-    res.status(200).json(
-      new ApiResponse(200, result, "Income source feedback sent successfully")
+    const result = await IncomeService.sendIncomeSourceFeedback(
+      description,
+      source
     );
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(200, result, "Income source feedback sent successfully")
+      );
   }
 );
 

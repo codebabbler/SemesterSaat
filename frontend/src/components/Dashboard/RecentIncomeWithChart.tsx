@@ -3,17 +3,8 @@
 import React, { useEffect, useState } from "react";
 import CustomPieChart from "~/components/Charts/CustomPieChart";
 import { formatCurrency } from "~/utils/constants";
+import type { IncomeData } from "~/types/transaction.types";
 
-interface Income {
-  _id: string;
-  source: string;
-  icon?: string;
-  date: string;
-  amount: number;
-  isRecurring?: boolean;
-  recurringPeriod?: "daily" | "weekly" | "monthly" | "yearly";
-  isVirtual?: boolean;
-}
 
 interface ChartData {
   name: string;
@@ -21,7 +12,7 @@ interface ChartData {
 }
 
 interface RecentIncomeWithChartProps {
-  data: Income[];
+  data: IncomeData[];
   totalIncome: number;
 }
 
