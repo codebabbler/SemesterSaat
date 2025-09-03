@@ -267,10 +267,13 @@ class AnomalyService {
 
   async resetCategoryStats(userId: string, category: string, transactionType: 'expense' | 'income'): Promise<void> {
     try {
-      // 1. Remove from database
+      // 1. Remove statistical data from database
       await AnomalyStats.deleteOne({ userId, category, transactionType });
 
-      // 2. Remove from in-memory detector
+      // 2. Remove historical anomaly detection records
+      await AnomalyDetection.deleteMany({ userId, category });
+
+      // 3. Remove from in-memory detector
       const detector = await this.getDetector(userId, transactionType);
       detector.resetCategory(category);
       
