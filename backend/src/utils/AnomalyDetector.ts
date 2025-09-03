@@ -64,8 +64,15 @@ class EWMAAnomalyDetector {
     // Calculate EWMA statistics first
     const newMean = this.ALPHA * amount + (1 - this.ALPHA) * previousMean;
     const newVariance = this.ALPHA * Math.pow(amount - previousMean, 2) + (1 - this.ALPHA) * previousVariance;
-    const newStandardDeviation = Math.sqrt(newVariance);
-    const previousStandardDeviation = Math.sqrt(previousVariance);
+
+    // Apply minimum variance floor for early transactions to prevent hypersensitivity
+    const newMinVarianceFloor = this.getMinimumVarianceFloor(newMean, newCount);
+    const adjustedNewVariance = Math.max(newVariance, newMinVarianceFloor);
+    const newStandardDeviation = Math.sqrt(adjustedNewVariance);
+
+    const previousMinVarianceFloor = this.getMinimumVarianceFloor(previousMean, previousCount);
+    const adjustedPreviousVariance = Math.max(previousVariance, previousMinVarianceFloor);
+    const previousStandardDeviation = Math.sqrt(adjustedPreviousVariance);
 
     let zScore = 0;
     let isAnomaly = false;
@@ -131,6 +138,16 @@ class EWMAAnomalyDetector {
 
   getCategoryStats(category: string): CategoryStats | null {
     return this.categoryStats.get(category) || null;
+  }
+
+  // Helper method to calculate minimum variance floor for early transactions
+  private getMinimumVarianceFloor(mean: number, transactionCount: number): number {
+    // Apply minimum variance floor only for early transactions (≤10)
+    if (transactionCount <= 10) {
+      const percentageFloor = transactionCount <= 5 ? 0.15 : 0.10; // 15% then 10%
+      return Math.pow(Math.abs(mean) * percentageFloor, 2);
+    }
+    return 0; // No floor for established patterns
   }
 
   resetCategory(category: string): void {
