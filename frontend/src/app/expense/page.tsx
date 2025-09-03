@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import DashboardLayout from "~/components/Layouts/DashboardLayout";
 import { useUserAuth } from "~/hooks/useUserAuth";
 import axiosInstance from "~/utils/axiosInstance";
@@ -12,7 +12,13 @@ import EditExpenseForm from "~/components/Expense/EditExpenseForm";
 import DeleteAlert from "~/components/DeleteAlert";
 import Modal from "~/components/Modal";
 import toast from "react-hot-toast";
-import type { ExpenseData, ExpenseFormData } from "~/types/transaction.types";
+import AnomalyDetectionPopup from "~/components/Anomaly/AnomalyDetectionPopup";
+import type {
+  ExpenseData,
+  ExpenseFormData,
+  AnomalyDetection,
+  AnomalyTransaction,
+} from "~/types/transaction.types";
 
 const Expense = () => {
   useUserAuth();
@@ -33,8 +39,38 @@ const Expense = () => {
     data: null,
   });
 
+  const [anomalyDetectionState, setAnomalyDetectionState] = useState<{
+    show: boolean;
+    data: AnomalyDetection | null;
+    pendingExpense: ExpenseFormData | null;
+  }>({
+    show: false,
+    data: null,
+    pendingExpense: null,
+  });
+
+  const [anomalyTransactions, setAnomalyTransactions] = useState<
+    AnomalyTransaction[]
+  >([]);
+
+  // Get Anomaly Transactions
+  const fetchAnomalyTransactions = useCallback(async () => {
+    try {
+      const response = await axiosInstance.get(
+        API_PATHS.ANOMALY.GET_TRANSACTIONS,
+      );
+      if (response.data?.data) {
+        setAnomalyTransactions(
+          response.data.data.anomalies as AnomalyTransaction[],
+        );
+      }
+    } catch (error) {
+      console.log("Failed to fetch anomaly transactions:", error);
+    }
+  }, []);
+
   // Get All Expense Details
-  const fetchExpenseDetails = async () => {
+  const fetchExpenseDetails = useCallback(async () => {
     if (loading) return;
 
     setLoading(true);
@@ -52,7 +88,7 @@ const Expense = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Handle Add Expense
   const handleAddExpense = async (expense: ExpenseFormData) => {
@@ -88,7 +124,7 @@ const Expense = () => {
     }
 
     try {
-      await axiosInstance.post(API_PATHS.EXPENSE.ADD_EXPENSE, {
+      const response = await axiosInstance.post(API_PATHS.EXPENSE.ADD_EXPENSE, {
         category,
         amount: Number(amount),
         date,
@@ -98,13 +134,23 @@ const Expense = () => {
         description,
       });
 
+      if (response.data?.data?.anomalyDetection?.isAnomaly) {
+        setAnomalyDetectionState({
+          show: true,
+          data: response.data.data.anomalyDetection,
+          pendingExpense: expense,
+        });
+        return;
+      }
+
       setOpenAddExpenseModal(false);
       toast.success("Expense added successfully");
       fetchExpenseDetails();
+      fetchAnomalyTransactions();
     } catch (error: any) {
       console.error(
         "Error adding expense:",
-        error.response?.data?.message || error.message,
+        error.response?.data?.message ?? error.message,
       );
       toast.error("Failed to add expense. Please try again.");
     }
@@ -168,7 +214,7 @@ const Expense = () => {
     } catch (error: any) {
       console.error(
         "Error updating expense:",
-        error.response?.data?.message || error.message,
+        error.response?.data?.message ?? error.message,
       );
       toast.error("Failed to update expense. Please try again.");
     }
@@ -183,7 +229,7 @@ const Expense = () => {
     } catch (error: any) {
       console.error(
         "Error toggling recurring:",
-        error.response?.data?.message || error.message,
+        error.response?.data?.message ?? error.message,
       );
       toast.error("Failed to update recurring status. Please try again.");
     }
@@ -200,10 +246,33 @@ const Expense = () => {
     } catch (error: any) {
       console.error(
         "Error deleting expense:",
-        error.response?.data?.message || error.message,
+        error.response?.data?.message ?? error.message,
       );
       toast.error("Failed to delete expense. Please try again.");
     }
+  };
+
+  // Handle anomaly detection popup confirmation
+  const handleAnomalyConfirm = () => {
+    setAnomalyDetectionState({
+      show: false,
+      data: null,
+      pendingExpense: null,
+    });
+    setOpenAddExpenseModal(false);
+    toast.success("Expense added successfully (anomaly acknowledged)");
+    fetchExpenseDetails();
+    fetchAnomalyTransactions();
+  };
+
+  // Handle anomaly detection popup cancellation
+  const handleAnomalyCancel = () => {
+    setAnomalyDetectionState({
+      show: false,
+      data: null,
+      pendingExpense: null,
+    });
+    toast("Expense submission cancelled", { icon: "ℹ️" });
   };
 
   // handle download expense details
@@ -233,7 +302,8 @@ const Expense = () => {
 
   useEffect(() => {
     void fetchExpenseDetails();
-  }, []);
+    void fetchAnomalyTransactions();
+  }, [fetchExpenseDetails, fetchAnomalyTransactions]);
 
   return (
     <DashboardLayout activeMenu="Expense">
@@ -252,6 +322,7 @@ const Expense = () => {
 
           <ExpenseList
             transactions={expenseData}
+            anomalyTransactions={anomalyTransactions}
             onDelete={(id) => {
               setOpenDeleteAlert({ show: true, data: id });
             }}
@@ -300,6 +371,15 @@ const Expense = () => {
               }
             />
           </Modal>
+
+          {anomalyDetectionState.data && (
+            <AnomalyDetectionPopup
+              isOpen={anomalyDetectionState.show}
+              onClose={handleAnomalyCancel}
+              onConfirm={handleAnomalyConfirm}
+              anomalyData={anomalyDetectionState.data}
+            />
+          )}
         </div>
       </div>
     </DashboardLayout>

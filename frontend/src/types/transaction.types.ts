@@ -14,6 +14,7 @@ export interface BaseTransaction {
 export interface ExpenseData extends BaseTransaction {
   category: string;
   description?: string;
+  anomalyDetection?: AnomalyDetection;
 }
 
 export interface IncomeData extends BaseTransaction {
@@ -65,4 +66,29 @@ export interface ExpenseLineData {
   isRecurring?: boolean;
   recurringPeriod?: RecurringPeriod;
   isVirtual?: boolean;
+}
+
+export interface AnomalyDetection {
+  isAnomaly: boolean;
+  zScore: number;
+  message: string;
+  category: string;
+  amount: number;
+  ewmaMean: number;
+  ewmaStandardDeviation: number;
+  transactionCount: number;
+}
+
+export interface AnomalyTransaction {
+  _id: string;
+  transactionId: string;
+  userId: string;
+  isAnomaly: boolean;
+  zScore: number;
+  confidence: number;
+  message: string;
+  category: string;
+  amount: number;
+  updatedAt: string;
+  createdAt: string;
 }

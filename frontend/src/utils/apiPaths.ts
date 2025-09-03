@@ -44,4 +44,8 @@ export const API_PATHS = {
   IMAGE: {
     UPLOAD_IMAGE: "/api/v1/upload/image",
   },
+  ANOMALY: {
+    GET_TRANSACTIONS: "/api/v1/anomaly/transactions",
+    RESET_CATEGORY: "/api/v1/anomaly/reset/category",
+  },
 };

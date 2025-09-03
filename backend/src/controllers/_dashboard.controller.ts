@@ -5,7 +5,6 @@ import ApiResponse from "../utils/ApiResponse";
 import { AuthenticatedRequest } from "../types/common.types";
 import DashboardService from "../services/dashboard.service";
 
-
 // Get Dashboard Data
 const getDashboardData = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -13,19 +12,14 @@ const getDashboardData = asyncHandler(
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { period = 30, limit = 5, predictive = "false" } = req.query;
+    const { period = 30, limit = 5 } = req.query;
 
     const periodDays = parseInt(period as string);
     const limitNum = parseInt(limit as string);
 
-    if (limitNum < 1 || limitNum > 50) {
-      throw new ApiErrors(400, "Limit must be between 1 and 50");
-    }
-
-    const dashboardData = await DashboardService.getDashboardData(req.user._id.toString(), {
+    const dashboardData = await DashboardService.getDashboardData(req.user._id, {
       period: periodDays,
       limit: limitNum,
-      predictive: predictive === "true",
     });
 
     res.status(200).json(
@@ -46,7 +40,7 @@ const getFinancialSummary = asyncHandler(
     const start = startDate ? new Date(startDate as string) : undefined;
     const end = endDate ? new Date(endDate as string) : undefined;
 
-    const summary = await DashboardService.getFinancialSummary(req.user._id.toString(), {
+    const summary = await DashboardService.getFinancialSummary(req.user._id, {
       startDate: start,
       endDate: end,
     });
@@ -66,7 +60,7 @@ const getCashFlowAnalysis = asyncHandler(
 
     const { period = "monthly" } = req.query;
 
-    const cashFlow = await DashboardService.getCashFlowAnalysis(req.user._id.toString(), {
+    const cashFlow = await DashboardService.getCashFlowAnalysis(req.user._id, {
       period: period as 'daily' | 'weekly' | 'monthly' | 'yearly',
     });
 

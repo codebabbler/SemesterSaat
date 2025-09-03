@@ -2,6 +2,7 @@ import {
   LuLayoutDashboard,
   LuHandCoins,
   LuWalletMinimal,
+  LuShieldAlert,
   LuLogOut,
 } from "react-icons/lu";
 import type { IconType } from "react-icons";
@@ -31,6 +32,12 @@ export const SIDE_MENU_DATA: SideMenuItem[] = [
     label: "Expense",
     icon: LuHandCoins,
     path: "/expense",
+  },
+  {
+    id: "04",
+    label: "Anomalies",
+    icon: LuShieldAlert,
+    path: "/anomalies",
   },
   {
     id: "06",

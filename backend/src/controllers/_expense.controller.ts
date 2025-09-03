@@ -3,40 +3,37 @@ import asyncHandler from "../utils/asyncHandler";
 import ApiErrors from "../utils/ApiErrors";
 import ApiResponse from "../utils/ApiResponse";
 import { AuthenticatedRequest } from "../types/common.types";
-import IncomeService from "../services/income.service";
+import ExpenseService from "../services/expense.service";
 import * as fs from "fs";
 
-// Add Income
-const addIncome = asyncHandler(
+// Add Expense
+const addExpense = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { icon, source, amount, date, isRecurring, recurringPeriod } =
-      req.body;
+    const { icon, category, amount, date } = req.body;
 
     // Parse date
     const parsedDate = new Date(date);
 
-    const result = await IncomeService.createIncome({
-      userId: req.user._id.toString(),
+    const result = await ExpenseService.createExpense({
+      userId: req.user._id,
       icon,
-      source,
+      category,
       amount,
       date: parsedDate,
-      isRecurring,
-      recurringPeriod,
     });
 
     res
       .status(201)
-      .json(new ApiResponse(201, result, "Income added successfully"));
+      .json(new ApiResponse(201, result, "Expense added successfully"));
   }
 );
 
-// Get All Income (For Logged-in User)
-const getAllIncome = asyncHandler(
+// Get All Expenses (For Logged-in User)
+const getAllExpenses = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new ApiErrors(401, "User not authenticated");
@@ -53,7 +50,7 @@ const getAllIncome = asyncHandler(
     const limitNum = parseInt(limit as string);
     const sortOrderTyped = sortOrder as "asc" | "desc";
 
-    const result = await IncomeService.getAllIncome(req.user._id, {
+    const result = await ExpenseService.getAllExpenses(req.user._id, {
       page: pageNum,
       limit: limitNum,
       sortBy: sortBy as string,
@@ -62,12 +59,12 @@ const getAllIncome = asyncHandler(
 
     res
       .status(200)
-      .json(new ApiResponse(200, result, "Income retrieved successfully"));
+      .json(new ApiResponse(200, result, "Expenses retrieved successfully"));
   }
 );
 
-// Get Income by ID
-const getIncomeById = asyncHandler(
+// Get Expense by ID
+const getExpenseById = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new ApiErrors(401, "User not authenticated");
@@ -75,45 +72,52 @@ const getIncomeById = asyncHandler(
 
     const { id } = req.params;
 
-    const income = await IncomeService.getIncomeById(req.user._id, id);
+    const expense = await ExpenseService.getExpenseById(req.user._id, id);
 
     res
       .status(200)
-      .json(new ApiResponse(200, income, "Income retrieved successfully"));
+      .json(new ApiResponse(200, expense, "Expense retrieved successfully"));
   }
 );
 
-// Update Income
-const updateIncome = asyncHandler(
+// Update Expense
+const updateExpense = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new ApiErrors(401, "User not authenticated");
     }
 
     const { id } = req.params;
-    const { icon, source, amount, date, isRecurring, recurringPeriod } =
-      req.body;
+    const { icon, category, amount, date } = req.body;
 
     // Parse date if provided
     const parsedDate = date ? new Date(date) : undefined;
 
-    const updatedIncome = await IncomeService.updateIncome(req.user._id, id, {
-      icon,
-      source,
-      amount,
-      date: parsedDate,
-      isRecurring,
-      recurringPeriod,
-    });
+    const updatedExpenseWithAnomaly = await ExpenseService.updateExpense(
+      req.user._id,
+      id,
+      {
+        icon,
+        category,
+        amount,
+        date: parsedDate,
+      }
+    );
 
     res
       .status(200)
-      .json(new ApiResponse(200, updatedIncome, "Income updated successfully"));
+      .json(
+        new ApiResponse(
+          200,
+          updatedExpenseWithAnomaly,
+          "Expense updated successfully"
+        )
+      );
   }
 );
 
-// Delete Income
-const deleteIncome = asyncHandler(
+// Delete Expense
+const deleteExpense = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new ApiErrors(401, "User not authenticated");
@@ -121,22 +125,48 @@ const deleteIncome = asyncHandler(
 
     const { id } = req.params;
 
-    await IncomeService.deleteIncome(req.user._id, id);
+    await ExpenseService.deleteExpense(req.user._id, id);
 
     res
       .status(200)
-      .json(new ApiResponse(200, null, "Income deleted successfully"));
+      .json(new ApiResponse(200, null, "Expense deleted successfully"));
   }
 );
 
-// Download Income Details in Excel
-const downloadIncomeExcel = asyncHandler(
+// Get Expenses by Category
+const getExpensesByCategory = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { filepath, filename } = await IncomeService.generateIncomeExcel(
+    const { category } = req.params;
+
+    const expenses = await ExpenseService.getExpensesByCategory(
+      req.user._id,
+      category
+    );
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          expenses,
+          "Expenses by category retrieved successfully"
+        )
+      );
+  }
+);
+
+// Download Expense Details in Excel
+const downloadExpenseExcel = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new ApiErrors(401, "User not authenticated");
+    }
+
+    const { filepath, filename } = await ExpenseService.generateExpenseExcel(
       req.user._id
     );
 
@@ -162,40 +192,22 @@ const downloadIncomeExcel = asyncHandler(
   }
 );
 
-// Get Income Statistics
-const getIncomeStats = asyncHandler(
+// Get Expense Statistics
+const getExpenseStats = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { year, month } = req.query;
+    const { year, month, category } = req.query;
 
     const filter = {
       year: year ? parseInt(year as string) : undefined,
       month: month ? parseInt(month as string) : undefined,
+      category: category as string,
     };
 
-    const result = await IncomeService.getIncomeStats(req.user._id, filter);
-
-    res
-      .status(200)
-      .json(
-        new ApiResponse(200, result, "Income statistics retrieved successfully")
-      );
-  }
-);
-
-// Predict Income Source using ML
-const predictIncomeSource = asyncHandler(
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    if (!req.user) {
-      throw new ApiErrors(401, "User not authenticated");
-    }
-
-    const { description } = req.body;
-
-    const result = await IncomeService.predictIncomeSource(description);
+    const result = await ExpenseService.getExpenseStats(req.user._id, filter);
 
     res
       .status(200)
@@ -203,42 +215,46 @@ const predictIncomeSource = asyncHandler(
         new ApiResponse(
           200,
           result,
-          "Income source prediction completed successfully"
+          "Expense statistics retrieved successfully"
         )
       );
   }
 );
 
-// Send Feedback for Income Source Prediction
-const sendIncomeSourceFeedback = asyncHandler(
+// Get Monthly Expense Trends
+const getMonthlyExpenseTrends = asyncHandler(
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user) {
       throw new ApiErrors(401, "User not authenticated");
     }
 
-    const { description, source } = req.body;
+    const { year = new Date().getFullYear() } = req.query;
 
-    const result = await IncomeService.sendIncomeSourceFeedback(
-      description,
-      source
+    const trends = await ExpenseService.getMonthlyExpenseTrends(
+      req.user._id,
+      parseInt(year as string)
     );
 
     res
       .status(200)
       .json(
-        new ApiResponse(200, result, "Income source feedback sent successfully")
+        new ApiResponse(
+          200,
+          trends,
+          "Monthly expense trends retrieved successfully"
+        )
       );
   }
 );
 
 export {
-  addIncome,
-  getAllIncome,
-  getIncomeById,
-  updateIncome,
-  deleteIncome,
-  downloadIncomeExcel,
-  getIncomeStats,
-  predictIncomeSource,
-  sendIncomeSourceFeedback,
+  addExpense,
+  getAllExpenses,
+  getExpenseById,
+  updateExpense,
+  deleteExpense,
+  getExpensesByCategory,
+  downloadExpenseExcel,
+  getExpenseStats,
+  getMonthlyExpenseTrends,
 };
