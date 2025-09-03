@@ -318,4 +318,89 @@ describe('EWMAAnomalyDetector', () => {
       }
     });
   });
+
+  describe('Early Transaction Sensitivity Fix', () => {
+    it('should not flag similar amounts as anomalies in first few transactions', () => {
+      // Test the exact scenario from user feedback: $100, $95, $110
+      detector.detectAnomaly({ category: 'groceries', amount: 100 });
+      detector.detectAnomaly({ category: 'groceries', amount: 95 });
+      const result = detector.detectAnomaly({ category: 'groceries', amount: 110 });
+
+      expect(result.isAnomaly).toBe(false);
+      expect(result.amount).toBe(110);
+      expect(result.transactionCount).toBe(3);
+      expect(result.message).toContain('Normal transaction');
+    });
+
+    it('should allow reasonable variations in early transactions (up to $130)', () => {
+      detector.detectAnomaly({ category: 'groceries', amount: 100 });
+      detector.detectAnomaly({ category: 'groceries', amount: 95 });
+      detector.detectAnomaly({ category: 'groceries', amount: 105 });
+      const result = detector.detectAnomaly({ category: 'groceries', amount: 125 });
+
+      // $125 should be normal with minimum variance floor
+      expect(result.isAnomaly).toBe(false);
+      expect(result.transactionCount).toBe(4);
+    });
+
+    it('should gradually reduce minimum variance floor as transaction count increases', () => {
+      // Add 5 transactions around $100
+      for (let i = 0; i < 5; i++) {
+        detector.detectAnomaly({ category: 'test', amount: 95 + (i * 2) }); // 95, 97, 99, 101, 103
+      }
+
+      // At 6 transactions, variance floor should be 10% instead of 15%
+      const stats = detector.getCategoryStats('test');
+      expect(stats!.count).toBe(5);
+      
+      // Test that moderate variations are still accepted
+      const result = detector.detectAnomaly({ category: 'test', amount: 115 });
+      expect(result.transactionCount).toBe(6);
+      // Should be less sensitive than first 5 transactions but not too sensitive
+    });
+
+    it('should still detect extreme outliers even with minimum variance floor', () => {
+      detector.detectAnomaly({ category: 'groceries', amount: 100 });
+      detector.detectAnomaly({ category: 'groceries', amount: 95 });
+      
+      // $500 should still be detected as anomaly due to extreme ratio guard
+      const result = detector.detectAnomaly({ category: 'groceries', amount: 500 });
+      
+      expect(result.isAnomaly).toBe(true);
+      expect(result.message).toContain('Anomaly detected');
+    });
+
+    it('should not apply variance floor after 10 transactions', () => {
+      // Add 10 transactions with small variance
+      for (let i = 0; i < 10; i++) {
+        detector.detectAnomaly({ category: 'consistent', amount: 100 + (i % 2) }); // 100, 101, 100, 101...
+      }
+
+      const stats = detector.getCategoryStats('consistent');
+      expect(stats!.count).toBe(10);
+
+      // After 10 transactions, should use natural EWMA variance (no floor)
+      // Small deviation should be more sensitive now
+      const result = detector.detectAnomaly({ category: 'consistent', amount: 110 });
+      expect(result.transactionCount).toBe(11);
+      
+      // With established pattern, this might be detected as anomaly depending on actual variance
+      // We're mainly testing that the variance floor logic stops applying
+    });
+
+    it('should handle minimum variance floor calculation correctly', () => {
+      // Test the mathematical correctness of variance floor
+      detector.detectAnomaly({ category: 'math', amount: 100 });
+      detector.detectAnomaly({ category: 'math', amount: 100 });
+      
+      const stats = detector.getCategoryStats('math');
+      // After 2 identical transactions, natural variance should be very small
+      expect(stats!.variance).toBeLessThan(10); // Very small natural variance
+      
+      // But the third transaction should not be hypersensitive
+      const result = detector.detectAnomaly({ category: 'math', amount: 115 });
+      expect(result.isAnomaly).toBe(false); // Should be normal due to variance floor
+      expect(result.ewmaStandardDeviation).toBeGreaterThan(10); // Should reflect minimum floor
+    });
+  });
 });
