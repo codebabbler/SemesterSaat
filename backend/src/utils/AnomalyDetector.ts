@@ -31,11 +31,104 @@ class EWMAAnomalyDetector {
     this.categoryStats = new Map();
   }
 
+  previewAnomaly(newTransaction: Transaction): AnomalyResult {
+    const category = newTransaction.category;
+    const amount = newTransaction.amount;
+
+    if (!this.categoryStats.has(category)) {
+      return {
+        isAnomaly: false,
+        zScore: 0,
+        message: `First transaction in category '${category}'. Amount NPR${amount.toFixed(2)} used as baseline.`,
+        category: category,
+        amount: amount,
+        ewmaMean: amount,
+        ewmaStandardDeviation: 0,
+        transactionCount: 1,
+      };
+    }
+
+    const stats = this.categoryStats.get(category)!;
+    const previousMean = stats.mean;
+    const previousVariance = stats.variance;
+    const previousCount = stats.count;
+    const newCount = stats.count + 1;
+
+    const newMean = this.ALPHA * amount + (1 - this.ALPHA) * previousMean;
+    const newVariance =
+      this.ALPHA * Math.pow(amount - previousMean, 2) +
+      (1 - this.ALPHA) * previousVariance;
+
+    const newMinVarianceFloor = this.getMinimumVarianceFloor(newMean, newCount);
+    const adjustedNewVariance = Math.max(newVariance, newMinVarianceFloor);
+    const newStandardDeviation = Math.sqrt(adjustedNewVariance);
+
+    const previousMinVarianceFloor = this.getMinimumVarianceFloor(
+      previousMean,
+      previousCount
+    );
+    const adjustedPreviousVariance = Math.max(
+      previousVariance,
+      previousMinVarianceFloor
+    );
+    const previousStandardDeviation = Math.sqrt(adjustedPreviousVariance);
+
+    let zScore = 0;
+    let isAnomaly = false;
+
+    const ratio = Math.abs(previousMean) > 0.01 ? amount / previousMean : 1;
+    const MIN_SIGMA = 1e-8;
+
+    if (previousStandardDeviation > MIN_SIGMA) {
+      zScore = (amount - previousMean) / previousStandardDeviation;
+      isAnomaly = Math.abs(zScore) > this.Z_SCORE_THRESHOLD;
+
+      if (ratio > 5.0 || ratio < 0.2) {
+        isAnomaly = true;
+        if (Math.abs(zScore) < 3.0) {
+          zScore = ratio > 1 ? 3.5 : -3.5;
+        }
+      }
+    }
+    else {
+      if (ratio > 10.0 || ratio < 0.1) {
+        isAnomaly = true;
+        zScore =
+          ratio > 1 ? Math.max(10.0, ratio) : Math.min(-10.0, -1 / ratio);
+      }
+      else {
+        const percentageThreshold = previousCount <= 3 ? 0.7 : 0.5;
+        const percentageChange =
+          Math.abs(amount - previousMean) / Math.abs(previousMean);
+
+        if (percentageChange > percentageThreshold) {
+          isAnomaly = true;
+          zScore = amount > previousMean ? 3.0 : -3.0;
+        } else {
+          isAnomaly = false;
+          zScore = 0;
+        }
+      }
+    }
+
+    return {
+      isAnomaly: isAnomaly,
+      zScore: zScore,
+      message: isAnomaly
+        ? "Anomaly detected: This transaction amount is unusual compared to your previous transactions in this category."
+        : `Normal transaction: Amount NPR${amount.toFixed(2)} is within normal range for category '${category}' (Z-score: ${zScore.toFixed(2)}).`,
+      category: category,
+      amount: amount,
+      ewmaMean: newMean,
+      ewmaStandardDeviation: newStandardDeviation,
+      transactionCount: newCount,
+    };
+  }
+
   detectAnomaly(newTransaction: Transaction): AnomalyResult {
     const category = newTransaction.category;
     const amount = newTransaction.amount;
 
-    // 1. FIRST TRANSACTION: Always baseline, never anomaly
     if (!this.categoryStats.has(category)) {
       this.categoryStats.set(category, {
         mean: amount,
@@ -61,13 +154,11 @@ class EWMAAnomalyDetector {
     const previousCount = stats.count;
     const newCount = stats.count + 1;
 
-    // Calculate EWMA statistics first
     const newMean = this.ALPHA * amount + (1 - this.ALPHA) * previousMean;
     const newVariance =
       this.ALPHA * Math.pow(amount - previousMean, 2) +
       (1 - this.ALPHA) * previousVariance;
 
-    // Apply minimum variance floor for early transactions to prevent hypersensitivity
     const newMinVarianceFloor = this.getMinimumVarianceFloor(newMean, newCount);
     const adjustedNewVariance = Math.max(newVariance, newMinVarianceFloor);
     const newStandardDeviation = Math.sqrt(adjustedNewVariance);
@@ -88,12 +179,10 @@ class EWMAAnomalyDetector {
     const ratio = Math.abs(previousMean) > 0.01 ? amount / previousMean : 1;
     const MIN_SIGMA = 1e-8;
 
-    // 2. WHEN SIGMA > 0: Z-score test + extreme ratio guard (5x/0.2x thresholds)
     if (previousStandardDeviation > MIN_SIGMA) {
       zScore = (amount - previousMean) / previousStandardDeviation;
       isAnomaly = Math.abs(zScore) > this.Z_SCORE_THRESHOLD;
 
-      // Extreme ratio guard: >5x or <0.2x always anomaly
       if (ratio > 5.0 || ratio < 0.2) {
         isAnomaly = true;
         if (Math.abs(zScore) < 3.0) {
@@ -101,17 +190,14 @@ class EWMAAnomalyDetector {
         }
       }
     }
-    // 3. WHEN SIGMA = 0: Adaptive percentage + extreme ratio guard (10x/0.1x thresholds)
     else {
-      // Extreme ratio guard: >10x or <0.1x with |Z|≥10 always anomaly
       if (ratio > 10.0 || ratio < 0.1) {
         isAnomaly = true;
         zScore =
           ratio > 1 ? Math.max(10.0, ratio) : Math.min(-10.0, -1 / ratio);
       }
-      // Adaptive percentage fallback
       else {
-        const percentageThreshold = previousCount <= 3 ? 0.7 : 0.5; // 70% for ≤3 tx, 50% afterwards
+        const percentageThreshold = previousCount <= 3 ? 0.7 : 0.5;
         const percentageChange =
           Math.abs(amount - previousMean) / Math.abs(previousMean);
 
@@ -125,7 +211,6 @@ class EWMAAnomalyDetector {
       }
     }
 
-    // Update stats after detection
     this.categoryStats.set(category, {
       mean: newMean,
       variance: newVariance,

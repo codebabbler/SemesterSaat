@@ -447,6 +447,12 @@ class ExpenseService {
     if (!deletedExpense) {
       throw new ApiErrors(404, "Expense not found");
     }
+
+    try {
+      await AnomalyService.rollbackTransaction(userId, expenseId, "expense");
+    } catch (rollbackError) {
+      console.error("Failed to rollback anomaly data:", rollbackError);
+    }
   }
 
   async getExpensesByCategory(

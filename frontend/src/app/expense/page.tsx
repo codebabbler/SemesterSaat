@@ -102,7 +102,6 @@ const Expense = () => {
       description,
     } = expense;
 
-    // Validation Checks
     if (!category.trim()) {
       toast.error("Category is required.");
       return;
@@ -124,6 +123,21 @@ const Expense = () => {
     }
 
     try {
+      const previewResponse = await axiosInstance.post(API_PATHS.ANOMALY.PREVIEW, {
+        transactionType: "expense",
+        category,
+        amount: Number(amount),
+      });
+
+      if (previewResponse.data?.data?.isAnomaly) {
+        setAnomalyDetectionState({
+          show: true,
+          data: previewResponse.data.data,
+          pendingExpense: expense,
+        });
+        return;
+      }
+
       const response = await axiosInstance.post(API_PATHS.EXPENSE.ADD_EXPENSE, {
         category,
         amount: Number(amount),
@@ -133,15 +147,6 @@ const Expense = () => {
         recurringPeriod: isRecurring ? recurringPeriod : undefined,
         description,
       });
-
-      if (response.data?.data?.anomalyDetection?.isAnomaly) {
-        setAnomalyDetectionState({
-          show: true,
-          data: response.data.data.anomalyDetection,
-          pendingExpense: expense,
-        });
-        return;
-      }
 
       setOpenAddExpenseModal(false);
       toast.success("Expense added successfully");
@@ -253,19 +258,53 @@ const Expense = () => {
   };
 
   // Handle anomaly detection popup confirmation
-  const handleAnomalyConfirm = () => {
-    setAnomalyDetectionState({
-      show: false,
-      data: null,
-      pendingExpense: null,
-    });
-    setOpenAddExpenseModal(false);
-    toast.success("Expense added successfully (anomaly acknowledged)");
-    fetchExpenseDetails();
-    fetchAnomalyTransactions();
+  const handleAnomalyConfirm = async () => {
+    if (!anomalyDetectionState.pendingExpense) return;
+
+    const {
+      category,
+      amount,
+      date,
+      icon,
+      isRecurring,
+      recurringPeriod,
+      description,
+    } = anomalyDetectionState.pendingExpense;
+
+    try {
+      await axiosInstance.post(API_PATHS.EXPENSE.ADD_EXPENSE, {
+        category,
+        amount: Number(amount),
+        date,
+        icon,
+        isRecurring,
+        recurringPeriod: isRecurring ? recurringPeriod : undefined,
+        description,
+      });
+
+      setAnomalyDetectionState({
+        show: false,
+        data: null,
+        pendingExpense: null,
+      });
+      setOpenAddExpenseModal(false);
+      toast.success("Expense added successfully (anomaly acknowledged)");
+      fetchExpenseDetails();
+      fetchAnomalyTransactions();
+    } catch (error: any) {
+      console.error(
+        "Error confirming expense:",
+        error.response?.data?.message ?? error.message,
+      );
+      toast.error("Failed to add expense. Please try again.");
+      setAnomalyDetectionState({
+        show: false,
+        data: null,
+        pendingExpense: null,
+      });
+    }
   };
 
-  // Handle anomaly detection popup cancellation
   const handleAnomalyCancel = () => {
     setAnomalyDetectionState({
       show: false,

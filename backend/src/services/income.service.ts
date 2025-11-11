@@ -1,6 +1,8 @@
 import Income from "../models/income.models";
 import type { IIncome } from "../models/income.models";
 import ApiErrors from "../utils/ApiErrors";
+import AnomalyService from "./anomaly.service";
+import type { AnomalyResult } from "../utils/AnomalyDetector";
 import {
   mlService,
   type PredictionResponse,
@@ -95,12 +97,16 @@ interface IncomeSourceFeedbackResult {
   mlServiceDown?: boolean;
 }
 
+interface IncomeWithAnomaly {
+  income: IIncome;
+  anomalyDetection: AnomalyResult;
+}
+
 class IncomeService {
-  async createIncome(incomeData: IncomeCreationData): Promise<IIncome> {
+  async createIncome(incomeData: IncomeCreationData): Promise<IncomeWithAnomaly> {
     const { userId, icon, source, amount, date, isRecurring, recurringPeriod } =
       incomeData;
 
-    // Validation
     if (
       [source, amount, date].some(
         (field) => field === undefined || field === null || field === ""
@@ -117,7 +123,6 @@ class IncomeService {
       throw new ApiErrors(400, "Invalid date format");
     }
 
-    // Validate recurring fields
     if (isRecurring && !recurringPeriod) {
       throw new ApiErrors(
         400,
@@ -132,7 +137,6 @@ class IncomeService {
       throw new ApiErrors(400, "Invalid recurring period");
     }
 
-    // Calculate next recurring date
     let nextRecurringDate: Date | undefined;
     if (isRecurring && recurringPeriod) {
       const baseDate = new Date(date);
@@ -160,7 +164,6 @@ class IncomeService {
       }
     }
 
-    // Create income
     const income = await Income.create({
       userId,
       icon: icon || "",
@@ -172,7 +175,33 @@ class IncomeService {
       nextRecurringDate,
     });
 
-    return income;
+    let anomalyResult: AnomalyResult;
+    try {
+      anomalyResult = await AnomalyService.detectAnomaly(
+        userId,
+        income._id.toString(),
+        "income",
+        source.trim(),
+        amount
+      );
+    } catch (anomalyError) {
+      console.error("Anomaly detection failed:", anomalyError);
+      anomalyResult = {
+        isAnomaly: false,
+        zScore: 0,
+        message: "Anomaly detection unavailable",
+        category: source.trim(),
+        amount,
+        ewmaMean: amount,
+        ewmaStandardDeviation: 0,
+        transactionCount: 1,
+      };
+    }
+
+    return {
+      income,
+      anomalyDetection: anomalyResult,
+    };
   }
 
   async getAllIncome(
@@ -365,6 +394,12 @@ class IncomeService {
 
     if (!deletedIncome) {
       throw new ApiErrors(404, "Income not found");
+    }
+
+    try {
+      await AnomalyService.rollbackTransaction(userId, incomeId, "income");
+    } catch (rollbackError) {
+      console.error("Failed to rollback anomaly data:", rollbackError);
     }
   }
 
@@ -816,4 +851,5 @@ export type {
   VirtualIncomeTransaction,
   IncomeSourcePrediction,
   IncomeSourceFeedbackResult,
+  IncomeWithAnomaly,
 };

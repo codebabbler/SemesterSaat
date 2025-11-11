@@ -93,10 +93,10 @@ const CustomBarChart: React.FC<CustomBarChartProps> = ({ data }) => {
           <div className="h-3 w-3 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
           <span>Recurring</span>
         </div>
-        <div className="flex items-center gap-1">
+        {/* <div className="flex items-center gap-1">
           <div className="h-3 w-3 rounded" style={{ backgroundColor: '#a855f7' }}></div>
           <span>Predicted</span>
-        </div>
+        </div> */}
       </div>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
