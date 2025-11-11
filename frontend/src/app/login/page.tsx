@@ -21,7 +21,11 @@ interface User {
 const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({
+    email: "",
+    password: "",
+    api: "",
+  });
 
   const context = useContext(UserContext);
   if (!context) {
@@ -30,21 +34,35 @@ const LoginForm = () => {
   const { updateUser } = context;
   const router = useRouter();
 
-  // Handle Login Form Submit
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const validateForm = () => {
+    const newErrors = {
+      email: "",
+      password: "",
+      api: "",
+    };
 
-    if (!validateEmail(email)) {
-      setError("Please enter a valid email address.");
-      return;
+    if (!email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!validateEmail(email)) {
+      newErrors.email = "Please enter a valid email address";
     }
 
     if (!password) {
-      setError("Please enter the password");
-      return;
+      newErrors.password = "Password is required";
+    } else if (password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
     }
 
-    setError("");
+    setErrors(newErrors);
+    return !newErrors.email && !newErrors.password;
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
 
     //Login API Call
     try {
@@ -52,7 +70,9 @@ const LoginForm = () => {
         email,
         password,
       });
-      const { data } = response.data as { data: { user: User; accessToken: string; refreshToken: string } };
+      const { data } = response.data as {
+        data: { user: User; accessToken: string; refreshToken: string };
+      };
 
       if (data.user) {
         // Convert _id to id for frontend compatibility
@@ -61,24 +81,28 @@ const LoginForm = () => {
         router.push("/dashboard");
       }
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as { response?: { data?: { message?: string } } };
-        if (axiosError.response?.data?.message) {
-          setError(axiosError.response.data.message);
-        } else {
-          setError("Something went wrong. Please try again.");
-        }
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as {
+          response?: { data?: { message?: string } };
+        };
+        const errorMessage =
+          axiosError.response?.data?.message ??
+          "Something went wrong. Please try again.";
+        setErrors((prev) => ({ ...prev, api: errorMessage }));
       } else {
-        setError("Something went wrong. Please try again.");
+        setErrors((prev) => ({
+          ...prev,
+          api: "Something went wrong. Please try again.",
+        }));
       }
     }
   };
 
   return (
     <AuthLayout>
-      <div className="lg:w-[70%] h-3/4 md:h-full flex flex-col justify-center">
+      <div className="flex h-3/4 flex-col justify-center md:h-full lg:w-[70%]">
         <h3 className="text-xl font-semibold text-black">Welcome Back</h3>
-        <p className="text-xs text-slate-700 mt-[5px] mb-6">
+        <p className="mt-[5px] mb-6 text-xs text-slate-700">
           Please enter your details to log in
         </p>
 
@@ -90,6 +114,9 @@ const LoginForm = () => {
             placeholder="john@example.com"
             type="text"
           />
+          {errors.email && (
+            <p className="mt-1 mb-2 text-xs text-red-500">{errors.email}</p>
+          )}
 
           <Input
             value={password}
@@ -98,16 +125,21 @@ const LoginForm = () => {
             placeholder="Min 8 Characters"
             type="password"
           />
+          {errors.password && (
+            <p className="mt-1 mb-2 text-xs text-red-500">{errors.password}</p>
+          )}
 
-          {error && <p className="text-red-500 text-xs pb-2.5">{error}</p>}
+          {errors.api && (
+            <p className="pb-2.5 text-xs text-red-500">{errors.api}</p>
+          )}
 
           <button type="submit" className="btn-primary">
             LOGIN
           </button>
 
-          <p className="text-[13px] text-slate-800 mt-3">
+          <p className="mt-3 text-[13px] text-slate-800">
             Don&apos;t have an account?{" "}
-            <Link className="font-medium text-primary underline" href="/signup">
+            <Link className="text-primary font-medium underline" href="/signup">
               SignUp
             </Link>
           </p>
