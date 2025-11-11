@@ -47,5 +47,7 @@ export const API_PATHS = {
   ANOMALY: {
     GET_TRANSACTIONS: "/api/v1/anomaly/transactions",
     RESET_CATEGORY: "/api/v1/anomaly/reset/category",
+    PREVIEW: "/api/v1/anomaly/preview",
+    ROLLBACK: (transactionId: string) => `/api/v1/anomaly/rollback/${transactionId}`,
   },
 };

@@ -11,8 +11,9 @@ import AddIncomeForm from "~/components/Income/AddIncomeForm";
 import EditIncomeForm from "~/components/Income/EditIncomeForm";
 import DeleteAlert from "~/components/DeleteAlert";
 import Modal from "~/components/Modal";
+import AnomalyDetectionPopup from "~/components/Anomaly/AnomalyDetectionPopup";
 import toast from "react-hot-toast";
-import type { IncomeData, IncomeFormData } from "~/types/transaction.types";
+import type { IncomeData, IncomeFormData, AnomalyDetection } from "~/types/transaction.types";
 
 
 const Income = () => {
@@ -30,6 +31,15 @@ const Income = () => {
   }>({
     show: false,
     data: null,
+  });
+  const [anomalyDetectionState, setAnomalyDetectionState] = useState<{
+    show: boolean;
+    data: AnomalyDetection | null;
+    pendingIncome: IncomeFormData | null;
+  }>({
+    show: false,
+    data: null,
+    pendingIncome: null,
   });
 
   // Get All Income Details
@@ -57,7 +67,6 @@ const Income = () => {
   const handleAddIncome = async (income: IncomeFormData) => {
     const { source, description, amount, date, icon, isRecurring, recurringPeriod } = income;
 
-    // Validation Checks
     if (!source.trim()) {
       toast.error("Source is required.");
       return;
@@ -79,6 +88,21 @@ const Income = () => {
     }
 
     try {
+      const previewResponse = await axiosInstance.post(API_PATHS.ANOMALY.PREVIEW, {
+        transactionType: "income",
+        category: source,
+        amount: Number(amount),
+      });
+
+      if (previewResponse.data?.data?.isAnomaly) {
+        setAnomalyDetectionState({
+          show: true,
+          data: previewResponse.data.data,
+          pendingIncome: income,
+        });
+        return;
+      }
+
       await axiosInstance.post(API_PATHS.INCOME.ADD_INCOME, {
         source,
         description,
@@ -207,7 +231,6 @@ const Income = () => {
         }
       );
 
-      // Create a URL for the blob
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
@@ -220,6 +243,61 @@ const Income = () => {
       console.error("Error downloading income details:", error);
       toast.error("Failed to download income details. Please try again.");
     }
+  };
+
+  const handleAnomalyConfirm = async () => {
+    if (!anomalyDetectionState.pendingIncome) return;
+
+    const {
+      source,
+      description,
+      amount,
+      date,
+      icon,
+      isRecurring,
+      recurringPeriod,
+    } = anomalyDetectionState.pendingIncome;
+
+    try {
+      await axiosInstance.post(API_PATHS.INCOME.ADD_INCOME, {
+        source,
+        description,
+        amount: Number(amount),
+        date,
+        icon,
+        isRecurring,
+        recurringPeriod: isRecurring ? recurringPeriod : undefined,
+      });
+
+      setAnomalyDetectionState({
+        show: false,
+        data: null,
+        pendingIncome: null,
+      });
+      setOpenAddIncomeModal(false);
+      toast.success("Income added successfully (anomaly acknowledged)");
+      fetchIncomeDetails();
+    } catch (error: any) {
+      console.error(
+        "Error confirming income:",
+        error.response?.data?.message || error.message,
+      );
+      toast.error("Failed to add income. Please try again.");
+      setAnomalyDetectionState({
+        show: false,
+        data: null,
+        pendingIncome: null,
+      });
+    }
+  };
+
+  const handleAnomalyCancel = () => {
+    setAnomalyDetectionState({
+      show: false,
+      data: null,
+      pendingIncome: null,
+    });
+    toast("Income submission cancelled", { icon: "ℹ️" });
   };
 
   useEffect(() => {
@@ -289,6 +367,15 @@ const Income = () => {
               onDelete={() => openDeleteAlert.data && deleteIncome(openDeleteAlert.data)}
             />
           </Modal>
+
+          {anomalyDetectionState.data && (
+            <AnomalyDetectionPopup
+              isOpen={anomalyDetectionState.show}
+              onClose={handleAnomalyCancel}
+              onConfirm={handleAnomalyConfirm}
+              anomalyData={anomalyDetectionState.data}
+            />
+          )}
         </div>
       </div>
     </DashboardLayout>

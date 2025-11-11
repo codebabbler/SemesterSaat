@@ -1,5 +1,7 @@
 import { Router } from "express";
 import {
+  previewAnomaly,
+  rollbackTransaction,
   getAnomalousTransactions,
   getAnomalyStats,
   resetCategoryStats,
@@ -11,27 +13,30 @@ import { verifyJWT } from "../middleware/auth.middleware";
 
 const router: Router = Router();
 
-// All routes require authentication
 router.use(verifyJWT);
 
-// Analytics and reports
+router.route("/preview")
+  .post(previewAnomaly);
+
+router.route("/rollback/:transactionId")
+  .post(rollbackTransaction);
+
 router.route("/transactions")
-  .get(getAnomalousTransactions);     // GET /api/v1/anomaly/transactions - Get anomalous transactions
+  .get(getAnomalousTransactions);
 
 router.route("/stats")
-  .get(getAnomalyStats);              // GET /api/v1/anomaly/stats - Get anomaly statistics
+  .get(getAnomalyStats);
 
-// Management operations
 router.route("/reset/category")
-  .post(resetCategoryStats);          // POST /api/v1/anomaly/reset/category - Reset specific category stats
+  .post(resetCategoryStats);
 
 router.route("/reset/all")
-  .post(resetAllStats);               // POST /api/v1/anomaly/reset/all - Reset all stats for transaction type
+  .post(resetAllStats);
 
 router.route("/reset/nuclear")
-  .post(nuclearResetUserData);        // POST /api/v1/anomaly/reset/nuclear - Nuclear reset all user data
+  .post(nuclearResetUserData);
 
 router.route("/debug")
-  .get(getDetectorDebugInfo);         // GET /api/v1/anomaly/debug - Get detector debug info
+  .get(getDetectorDebugInfo);
 
 export default router;

@@ -16,6 +16,11 @@ const config = {
       },
     ],
   },
+
+  allowedDevOrigins: [
+    'http://192.168.1.196:3000',
+    'http://192.168.1.196',
+  ],
 };
 
 export default config;
